@@ -3,13 +3,14 @@
 set -e
 
 usage() {
-  echo "Usage: git zone <ref-or-pr> [-c <new-branch-name>]"
+  echo "Usage: git zone [<ref-or-pr>] [-c <new-branch-name>]"
   echo
   echo "Create a new worktree for a given branch, ref, PR number, or PR URL."
   echo "Mimics 'git switch' behavior."
   echo
   echo "Arguments:"
   echo "  ref-or-pr     Reference (branch, tag, commit), PR number, or PR URL."
+  echo "                If omitted, uses the current commit."
   echo
   echo "Options:"
   echo "  -c <name>     Create a new branch named <name> before switching."
@@ -59,8 +60,9 @@ done
 
 # --- Validation ---
 if [[ -z "$REF_OR_PR" ]]; then
-  usage
-  exit 1
+  # If ref-or-pr is not provided, use current commit
+  REF_OR_PR="$(git rev-parse HEAD)"
+  echo "No reference provided, using current commit: $REF_OR_PR"
 fi
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
