@@ -1,0 +1,120 @@
+#!/bin/bash
+
+set -e
+
+usage() {
+  echo "Usage: git zone <branch-name> [<source-ref>]"
+  echo "Usage: git zone <|pr-number|pr-url>"
+  echo
+  echo "Create a new worktree for the specified branch, PR number, or PR URL."
+  echo
+  echo "Arguments:"
+  echo "  branch-name   Name of the branch to create or use."
+  echo "  pr-number     GitHub PR number (e.g., 123)"
+  echo "  pr-url        GitHub PR URL (e.g., https://github.com/owner/repo/pull/123)"
+  echo "  source-ref    Reference to track (default: current branch, ignored for PRs)."
+  echo
+  echo "Options:"
+  echo "  -h, --help    Show this help message and exit."
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+if [ -z "$1" ]; then
+  usage
+  exit 1
+fi
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Error: Not inside a git repository."
+  exit 1
+fi
+
+INPUT="$1"
+SOURCE_REF="${2:-@}"
+WORKTREE_ROOT="$(git worktree list | awk 'NR==1{print $1}')"
+
+# Detect if input is a PR number or PR URL
+is_pr() {
+  [[ "$1" =~ ^[0-9]+$ ]] || [[ "$1" =~ github\.com/.+/pull/[0-9]+ ]]
+}
+
+# Handle PR checkout
+if is_pr "$INPUT"; then
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "Error: GitHub CLI (gh) is required for PR checkout functionality."
+    exit 1
+  fi
+
+  echo "Setting up worktree for PR: $INPUT"
+
+  # Extract PR number for directory naming
+  if [[ "$INPUT" =~ ^[0-9]+$ ]]; then
+    PR_NUM="$INPUT"
+  else
+    PR_NUM="$(echo "$INPUT" | grep -o '/pull/[0-9]\+' | cut -d'/' -f3)"
+  fi
+
+  BRANCH_NAME_FOR_DIR="pr-$PR_NUM"
+
+  echo "Creating worktree for PR $PR_NUM"
+else
+  # Traditional branch handling
+  BRANCH_NAME="$INPUT"
+  BRANCH_NAME_FOR_DIR="$INPUT"
+
+  if [[ "$(git branch --list "$BRANCH_NAME")" == "" ]]; then
+    echo "Creating new branch '$BRANCH_NAME' tracking '$SOURCE_REF'."
+    git branch --track "$BRANCH_NAME" "$SOURCE_REF"
+  else
+    echo "Branch '$BRANCH_NAME' already exists. Using existing branch."
+  fi
+fi
+
+ZONE_DIR="$WORKTREE_ROOT.$BRANCH_NAME_FOR_DIR"
+
+cd "$WORKTREE_ROOT"
+
+# For PRs, create worktree first and then checkout PR inside it
+if is_pr "$INPUT"; then
+  # Create worktree with a temporary branch (will be replaced by PR checkout)
+  git worktree add --detach "$ZONE_DIR"
+  cd "$ZONE_DIR"
+
+  # Now checkout the PR in this worktree
+  echo "Checking out PR $INPUT in worktree..."
+  if ! gh pr checkout "$INPUT" 2>/dev/null; then
+    echo "Error: Failed to checkout PR $INPUT in worktree"
+    cd "$WORKTREE_ROOT"
+    git worktree remove "$ZONE_DIR" 2>/dev/null || true
+    exit 1
+  fi
+
+  echo "Successfully checked out PR $PR_NUM"
+else
+  # Traditional worktree creation for regular branches
+  git worktree add "$ZONE_DIR" "$BRANCH_NAME"
+  cd "$ZONE_DIR"
+fi
+if [ -f "$WORKTREE_ROOT/.git/zone.sh" ]; then
+  echo "Loading zone script from $WORKTREE_ROOT/.git/zone.sh"
+  source "$WORKTREE_ROOT/.git/zone.sh"
+fi
+
+echo
+echo "ZONE_DIR: $ZONE_DIR"
+if command -v zoxide >/dev/null; then
+  echo
+  echo "Using zoxide to change directory."
+  zoxide add "$ZONE_DIR"
+fi
