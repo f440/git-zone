@@ -179,11 +179,7 @@ if command -v mise >/dev/null; then
   echo "Mise setup complete."
 fi
 
-echo
-echo "ZONE_DIR: $ZONE_DIR"
 if command -v zoxide >/dev/null; then
-  echo
-  echo "Using zoxide to change directory."
   zoxide add "$ZONE_DIR"
 fi
 
@@ -215,3 +211,5 @@ if [ "$TMUX_MODE" = true ]; then
     fi
   fi
 fi
+
+echo "Created: $ZONE_DIR"
