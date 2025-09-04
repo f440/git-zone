@@ -17,6 +17,7 @@ description = "Install dependencies"
 depends = ["install:*"]
 alias = "i"
 
+# Default setup task (can be customized with GIT_ZONE_MISE_SETUP_TASK environment variable)
 [tasks."zone:setup"]
 description = "Setup git-zone"
 run = """
@@ -32,3 +33,15 @@ ln -snf "$WORKTREE_ROOT/.claude" "$ZONE_DIR/.claude"
 
 mise run install
 """
+
+# Example of custom setup task
+# To use this instead of "zone:setup", set: export GIT_ZONE_MISE_SETUP_TASK="my-setup"
+# [tasks."my-setup"]
+# description = "Custom setup for git-zone"
+# run = """
+# WORKTREE_ROOT="{{arg(i=1, name="worktree_root")}}"
+# ZONE_DIR="{{arg(i=2, name="zone_dir")}}"
+# 
+# # Your custom setup logic here
+# echo "Running custom setup for $ZONE_DIR"
+# """

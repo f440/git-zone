@@ -167,10 +167,12 @@ if command -v mise >/dev/null; then
     if ! mise trust "$ZONE_DIR" 2>/dev/null; then
       echo "Warning: Failed to trust mise configuration in $ZONE_DIR" >&2
     fi
-    if mise tasks ls 2>/dev/null | grep -q "^zone:setup "; then
-      echo "Running zone:setup task..."
-      if ! mise run zone:setup "$WORKTREE_ROOT" "$ZONE_DIR" 2>/dev/null; then
-        echo "Warning: zone:setup task failed. Continuing without setup." >&2
+    # Use environment variable for task name, default to "zone:setup"
+    MISE_SETUP_TASK="${GIT_ZONE_MISE_SETUP_TASK:-zone:setup}"
+    if mise tasks ls 2>/dev/null | grep -q "^${MISE_SETUP_TASK} "; then
+      echo "Running ${MISE_SETUP_TASK} task..."
+      if ! mise run "${MISE_SETUP_TASK}" "$WORKTREE_ROOT" "$ZONE_DIR" 2>/dev/null; then
+        echo "Warning: ${MISE_SETUP_TASK} task failed. Continuing without setup." >&2
       fi
     fi
   fi

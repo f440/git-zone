@@ -40,49 +40,65 @@ chmod +x git-zone
 mv git-zone /usr/local/bin/
 ```
 
+For zsh completion, copy `_git-zone` to your completions directory:
+
+```bash
+curl -O https://raw.githubusercontent.com/f440/git-zone/main/_git-zone
+mv _git-zone ~/.zsh/completions/
+```
+
 ## Examples
 
 Create worktree for existing branch:
+
 ```bash
 git zone feature-branch
 ```
 
 Create worktree for remote branch:
+
 ```bash
 git zone origin/main
 ```
 
 Create new branch from current commit:
+
 ```bash
 git zone -c new-feature
 ```
 
 Create new branch from specific commit:
+
 ```bash
 git zone abc1234 -c fix-bug
 ```
 
 Checkout PR by number:
+
 ```bash
 git zone 123
 ```
 
 Checkout PR by URL:
+
 ```bash
 git zone https://github.com/owner/repo/pull/123
 ```
 
 Create worktree from tag:
+
 ```bash
 git zone v1.2.3
 ```
 
 Create worktree with tmux session:
+
 ```bash
 git zone feature-branch -T
 ```
 
 Use current commit when no reference specified:
+
 ```bash
 git zone -c quick-fix
 ```
@@ -116,6 +132,11 @@ git-zone exits with status 0 on success, 1 on error.
 - **zoxide** - Optional. Automatically indexes worktree directories when available
 
 **Tip:** Use [sesh](https://github.com/joshmedeski/sesh) to quickly switch between tmux sessions created by `git zone -T`.
+
+## Environment Variables
+
+- **GIT_ZONE_MISE_SETUP_TASK**  
+  Name of the mise task to run when setting up new worktrees. Defaults to `zone:setup`.
 
 ## Integration Examples
 
