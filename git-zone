@@ -160,9 +160,21 @@ else
   fi
 fi
 
-if [ -f "$WORKTREE_ROOT/.git/zone.sh" ]; then
-  echo "Loading zone script from $WORKTREE_ROOT/.git/zone.sh"
-  source "$WORKTREE_ROOT/.git/zone.sh"
+if command -v mise >/dev/null; then
+  echo "Setting up mise for the new worktree..."
+  if [ -f "$WORKTREE_ROOT/.mise.local.toml" ]; then
+    ln -sf "$WORKTREE_ROOT/.mise.local.toml" "$ZONE_DIR/.mise.local.toml"
+    if ! mise trust "$ZONE_DIR" 2>/dev/null; then
+      echo "Warning: Failed to trust mise configuration in $ZONE_DIR" >&2
+    fi
+    if mise tasks ls 2>/dev/null | grep -q "^zone:setup "; then
+      echo "Running zone:setup task..."
+      if ! mise run zone:setup "$WORKTREE_ROOT" "$ZONE_DIR" 2>/dev/null; then
+        echo "Warning: zone:setup task failed. Continuing without setup." >&2
+      fi
+    fi
+  fi
+  echo "Mise setup complete."
 fi
 
 echo

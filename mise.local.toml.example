@@ -1,0 +1,34 @@
+[env]
+PRETTIER_EXPERIMENTAL_CLI = "true"
+
+[settings]
+jobs = 8
+
+[tasks."install:bundle"]
+description = "bundle install"
+run = 'bundle install'
+
+[tasks."install:pnpm"]
+description = "pnpm install"
+run = 'pnpm install'
+
+[tasks.install]
+description = "Install dependencies"
+depends = ["install:*"]
+alias = "i"
+
+[tasks."zone:setup"]
+description = "Setup git-zone"
+run = """
+mise install
+
+WORKTREE_ROOT="{{arg(i=1, name="worktree_root")}}"
+ZONE_DIR="{{arg(i=2, name="zone_dir")}}"
+
+ln -snf "$WORKTREE_ROOT/.env.development.local" "$ZONE_DIR/.env.development.local"
+ln -snf "$WORKTREE_ROOT/lefthook.yml" "$ZONE_DIR/lefthook.yml"
+ln -snf "$WORKTREE_ROOT/CLAUDE.md" "$ZONE_DIR/CLAUDE.md"
+ln -snf "$WORKTREE_ROOT/.claude" "$ZONE_DIR/.claude"
+
+mise run install
+"""
