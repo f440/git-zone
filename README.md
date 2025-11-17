@@ -32,10 +32,10 @@ Unlike `git switch`, git-zone creates separate working directories instead of sw
 
 ## Installation
 
-Place the git-zone script in a directory within your PATH. The script will be available as both `git-zone` and `git zone`.
+Place the git-zone script (located at `bin/git-zone`) in a directory within your PATH. The script will be available as both `git-zone` and `git zone`.
 
 ```bash
-curl -O https://raw.githubusercontent.com/f440/git-zone/main/git-zone
+curl -O https://raw.githubusercontent.com/f440/git-zone/main/bin/git-zone
 chmod +x git-zone
 mv git-zone /usr/local/bin/
 ```
