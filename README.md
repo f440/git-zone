@@ -5,7 +5,7 @@ Create git worktrees for branches, PRs, and refs
 ## Synopsis
 
 ```
-git zone [<ref-or-pr>] [-c|--create <branch-name>] [-T|--tmux]
+git zone [<ref-or-pr>] [-c|--create <branch-name>]
 ```
 
 ## Description
@@ -18,9 +18,6 @@ Unlike `git switch`, git-zone creates separate working directories instead of sw
 
 - **-c**, **--create** *branch-name*  
   Create a new branch named *branch-name* before switching to the worktree.
-
-- **-T**, **--tmux**  
-  Create and attach to a tmux session for the worktree.
 
 - **-h**, **--help**  
   Show usage information and exit.
@@ -91,25 +88,11 @@ Create worktree from tag:
 git zone v1.2.3
 ```
 
-Create worktree with tmux session:
-
-```bash
-git zone feature-branch -T
-```
-
 Use current commit when no reference specified:
 
 ```bash
 git zone -c quick-fix
 ```
-
-## Behavior
-
-git-zone automatically detects when running inside a tmux session and adjusts its behavior accordingly:
-
-- When run outside tmux: `-T` creates a new session and attaches to it
-- When run inside tmux: `-T` creates a new session and switches to it without detaching
-- This detection happens automatically without user configuration
 
 ## Files
 
@@ -127,11 +110,7 @@ git-zone exits with status 0 on success, 1 on error.
 
 - **git** - Required for all operations
 - **gh** - Required for pull request operations  
-- **tmux** - Optional. Required for -T option
 - **mise** - Optional. Automatically configures development environments when available
-- **zoxide** - Optional. Automatically indexes worktree directories when available
-
-**Tip:** Use [sesh](https://github.com/joshmedeski/sesh) to quickly switch between tmux sessions created by `git zone -T`.
 
 ## Environment Variables
 
@@ -162,4 +141,4 @@ npm install
 
 ## See Also
 
-git-worktree(1), git-switch(1), gh-pr-checkout(1), tmux(1)
+git-worktree(1), git-switch(1), gh-pr-checkout(1)

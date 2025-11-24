@@ -17,7 +17,6 @@ description = "Install dependencies"
 depends = ["install:*"]
 alias = "i"
 
-# Default setup task (can be customized with GIT_ZONE_MISE_SETUP_TASK environment variable)
 [tasks."zone:setup"]
 description = "Setup git-zone"
 run = """
@@ -31,17 +30,8 @@ ln -snf "$WORKTREE_ROOT/lefthook.yml" "$ZONE_DIR/lefthook.yml"
 ln -snf "$WORKTREE_ROOT/CLAUDE.md" "$ZONE_DIR/CLAUDE.md"
 ln -snf "$WORKTREE_ROOT/.claude" "$ZONE_DIR/.claude"
 
-mise run install
+ZONE_NAME=$(basename "$ZONE_DIR")
+SESSION_NAME="${ZONE_NAME//./_}"
+tmux new-session -c "$ZONE_DIR" -s "$SESSION_NAME" -d
+tmux new-window -t "$SESSION_NAME:1" -n install -c "$ZONE_DIR" -d "mise install && mise run --jobs=10 install"
 """
-
-# Example of custom setup task
-# To use this instead of "zone:setup", set: export GIT_ZONE_MISE_SETUP_TASK="my-setup"
-# [tasks."my-setup"]
-# description = "Custom setup for git-zone"
-# run = """
-# WORKTREE_ROOT="{{arg(i=1, name="worktree_root")}}"
-# ZONE_DIR="{{arg(i=2, name="zone_dir")}}"
-# 
-# # Your custom setup logic here
-# echo "Running custom setup for $ZONE_DIR"
-# """

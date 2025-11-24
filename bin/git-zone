@@ -3,7 +3,7 @@
 set -e
 
 usage() {
-  echo "Usage: git zone [<ref-or-pr>] [-c|--create <new-branch-name>] [-T|--tmux]"
+  echo "Usage: git zone [<ref-or-pr>] [-c|--create <new-branch-name>]"
   echo
   echo "Create a new worktree for a given branch, ref, PR number, or PR URL."
   echo "Mimics 'git switch' behavior."
@@ -14,14 +14,12 @@ usage() {
   echo
   echo "Options:"
   echo "  -c, --create <name>  Create a new branch named <name> before switching."
-  echo "  -T, --tmux           Create and attach to a tmux session for the worktree."
   echo "  -h, --help           Show this help message and exit."
 }
 
 # --- Argument Parsing ---
 REF_OR_PR=""
 NEW_BRANCH_NAME=""
-TMUX_MODE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,10 +36,6 @@ while [[ $# -gt 0 ]]; do
       fi
       NEW_BRANCH_NAME="$2"
       shift 2
-      ;;
-    -T|--tmux)
-      TMUX_MODE=true
-      shift
       ;;
     -h|--help)
       usage
@@ -177,39 +171,6 @@ if command -v mise >/dev/null; then
     fi
   fi
   echo "Mise setup complete."
-fi
-
-if command -v zoxide >/dev/null; then
-  zoxide add "$ZONE_DIR"
-fi
-
-if [ "$TMUX_MODE" = true ]; then
-  if ! command -v tmux >/dev/null 2>&1; then
-    echo "Error: tmux is required for -T option but not found." >&2
-    exit 1
-  fi
-  
-  session_name=$(basename "$ZONE_DIR" | tr '.' '_')
-  
-  if tmux has-session -t "$session_name" 2>/dev/null; then
-    echo "tmux session '$session_name' already exists."
-    if [ -n "$TMUX" ]; then
-      echo "Switching to existing session '$session_name'."
-      tmux switch-client -t "$session_name"
-    else
-      echo "Attaching to existing session '$session_name'."
-      tmux attach-session -t "$session_name"
-    fi
-  else
-    if [ -n "$TMUX" ]; then
-      echo "Creating new session '$session_name' and switching (directory: $ZONE_DIR)"
-      tmux new-session -d -s "$session_name" -c "$ZONE_DIR"
-      tmux switch-client -t "$session_name"
-    else
-      echo "Creating new session '$session_name' (directory: $ZONE_DIR)"
-      tmux new-session -s "$session_name" -c "$ZONE_DIR"
-    fi
-  fi
 fi
 
 echo "Created: $ZONE_DIR"
