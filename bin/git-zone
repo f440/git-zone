@@ -76,6 +76,20 @@ is_pr() {
   [[ "$1" =~ ^[0-9]+$ ]] || [[ "$1" =~ github\.com/.+/pull/[0-9]+ ]]
 }
 
+run_zone_setup() {
+  local setup_command
+  setup_command="$(git config --get zone.setup 2>/dev/null || true)"
+
+  if [[ -z "$setup_command" ]]; then
+    return
+  fi
+
+  echo "Running git-configured zone.setup command..."
+  if ! WORKTREE_ROOT="$WORKTREE_ROOT" ZONE_DIR="$ZONE_DIR" bash -c "$setup_command"; then
+    echo "Warning: zone.setup command failed. Continuing without setup." >&2
+  fi
+}
+
 # --- Main Logic ---
 
 cd "$WORKTREE_ROOT"
@@ -154,23 +168,6 @@ else
   fi
 fi
 
-if command -v mise >/dev/null; then
-  echo "Setting up mise for the new worktree..."
-  if [ -f "$WORKTREE_ROOT/.mise.local.toml" ]; then
-    ln -sf "$WORKTREE_ROOT/.mise.local.toml" "$ZONE_DIR/.mise.local.toml"
-    if ! mise trust "$ZONE_DIR" 2>/dev/null; then
-      echo "Warning: Failed to trust mise configuration in $ZONE_DIR" >&2
-    fi
-    # Use environment variable for task name, default to "zone:setup"
-    MISE_SETUP_TASK="${GIT_ZONE_MISE_SETUP_TASK:-zone:setup}"
-    if mise tasks ls 2>/dev/null | grep -q "^${MISE_SETUP_TASK} "; then
-      echo "Running ${MISE_SETUP_TASK} task..."
-      if ! mise run "${MISE_SETUP_TASK}" "$WORKTREE_ROOT" "$ZONE_DIR" 2>/dev/null; then
-        echo "Warning: ${MISE_SETUP_TASK} task failed. Continuing without setup." >&2
-      fi
-    fi
-  fi
-  echo "Mise setup complete."
-fi
+run_zone_setup
 
 echo "Created: $ZONE_DIR"

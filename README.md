@@ -94,13 +94,17 @@ Use current commit when no reference specified:
 git zone -c quick-fix
 ```
 
-## Files
+## Worktree Setup Hooks
 
-- **.mise.local.toml**  
-  Project-specific mise configuration. If present and mise is available, git-zone will link this file to new worktrees and run the `zone:setup` task.
+After creating a worktree, git-zone checks the repository's git config for a `zone.setup` entry. When present, the configured shell snippet runs with `WORKTREE_ROOT` and `ZONE_DIR` exported so you can link dotfiles, install dependencies, or launch tooling inside the worktree.
 
-- **mise.local.toml.example**  
-  Example mise configuration file provided with git-zone.
+Simple example:
+
+```bash
+git config zone.setup 'cd "$ZONE_DIR" && ln -snf "$WORKTREE_ROOT/.env" "$ZONE_DIR/.env" && npm install'
+```
+
+Use `git config --global` if you want a default hook for every repository; per-repo configs override the global one.
 
 ## Exit Status
 
@@ -109,13 +113,14 @@ git-zone exits with status 0 on success, 1 on error.
 ## Dependencies
 
 - **git** - Required for all operations
-- **gh** - Required for pull request operations  
-- **mise** - Optional. Automatically configures development environments when available
+- **gh** - Required for pull request operations
 
 ## Environment Variables
 
-- **GIT_ZONE_MISE_SETUP_TASK**  
-  Name of the mise task to run when setting up new worktrees. Defaults to `zone:setup`.
+`zone.setup` hooks receive two environment variables:
+
+- `WORKTREE_ROOT` – The repository path returned by `git worktree list`.
+- `ZONE_DIR` – The directory path of the worktree that was just created.
 
 ## Integration Examples
 
@@ -127,7 +132,13 @@ my-project.feature-branch/  # Worktree for feature-branch
 my-project.pr-123/          # Worktree for PR #123
 ```
 
-Example .mise.local.toml for automatic worktree setup:
+Pair the hook with [mise](https://mise.jdx.dev/):
+
+```bash
+git config zone.setup 'ln -sf "$WORKTREE_ROOT/.mise.local.toml" "$ZONE_DIR/.mise.local.toml" && cd "$ZONE_DIR" && mise run zone:setup'
+```
+
+Example `.mise.local.toml` for the `zone:setup` task:
 
 ```toml
 [tasks."zone:setup"]
