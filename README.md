@@ -140,6 +140,8 @@ git config zone.setup 'ln -sf "$WORKTREE_ROOT/.mise.local.toml" "$ZONE_DIR/.mise
 
 Example `.mise.local.toml` for the `zone:setup` task:
 
+See `mise.local.toml.example` for a more complete, multi-step setup definition you can adapt to your project.
+
 ```toml
 [tasks."zone:setup"]
 run = """
