@@ -135,7 +135,7 @@ my-project.pr-123/          # Worktree for PR #123
 Pair the hook with [mise](https://mise.jdx.dev/):
 
 ```bash
-git config zone.setup 'ln -sf "$WORKTREE_ROOT/.mise.local.toml" "$ZONE_DIR/.mise.local.toml" && cd "$ZONE_DIR" && mise run zone:setup'
+git config zone.setup 'ln -sf "$WORKTREE_ROOT/.mise.local.toml" "$ZONE_DIR/.mise.local.toml" && cd "$ZONE_DIR" && mise run zone:setup "$WORKTREE_ROOT" "$ZONE_DIR"'
 ```
 
 Example `.mise.local.toml` for the `zone:setup` task:
