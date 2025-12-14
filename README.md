@@ -96,12 +96,12 @@ git zone -c quick-fix
 
 ## Worktree Setup Hooks
 
-After creating a worktree, git-zone checks the repository's git config for a `zone.setup` entry. When present, the configured shell snippet runs with `WORKTREE_ROOT` and `ZONE_DIR` exported so you can link dotfiles, install dependencies, or launch tooling inside the worktree.
+After creating a worktree, git-zone checks the repository's git config for a `zone.setup` entry. When present, the configured shell snippet runs with `WORKTREE_ROOT` exported, and the current directory set to the newly created worktree, so you can link dotfiles, install dependencies, or launch tooling inside the worktree.
 
 Simple example:
 
 ```bash
-git config zone.setup 'cd "$ZONE_DIR" && ln -snf "$WORKTREE_ROOT/.env" "$ZONE_DIR/.env" && npm install'
+git config zone.setup 'ln -snf "$WORKTREE_ROOT/.env" . && npm install'
 ```
 
 Use `git config --global` if you want a default hook for every repository; per-repo configs override the global one.
@@ -117,10 +117,11 @@ git-zone exits with status 0 on success, 1 on error.
 
 ## Environment Variables
 
-`zone.setup` hooks receive two environment variables:
+`zone.setup` hooks receive one environment variable:
 
 - `WORKTREE_ROOT` – The repository path returned by `git worktree list`.
-- `ZONE_DIR` – The directory path of the worktree that was just created.
+
+The hook runs with the current directory set to the worktree directory (use `$PWD` if you need the absolute path).
 
 ## Integration Examples
 
@@ -135,7 +136,7 @@ my-project.pr-123/          # Worktree for PR #123
 Pair the hook with [mise](https://mise.jdx.dev/):
 
 ```bash
-git config zone.setup 'ln -sf "$WORKTREE_ROOT/.mise.local.toml" "$ZONE_DIR/" && mise trust "$ZONE_DIR" && mise run zone:setup'
+git config zone.setup 'ln -sf "$WORKTREE_ROOT/.mise.local.toml" . && mise trust -q "$PWD" && mise run zone:setup'
 ```
 
 Example `.mise.local.toml` for the `zone:setup` task:
@@ -146,10 +147,9 @@ See `mise.local.toml.example` for a more complete, multi-step setup definition y
 [tasks."zone:setup"]
 usage = '''
 flag "--worktree-root <worktree_root>" help="Path to the worktree root directory" env="WORKTREE_ROOT"
-flag "--zone-dir <zone_dir>" help="Path to the zone directory to set up" env="ZONE_DIR"
 '''
 run = """
-ln -snf "${usage_worktree_root?}/.env" "${usage_zone_dir?}/"
+ln -snf "${usage_worktree_root?}/.env" .
 npm install
 """
 ```

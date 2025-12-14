@@ -21,19 +21,18 @@ alias = "i"
 description = "Setup git-zone"
 usage = '''
 flag "--worktree-root <worktree_root>" help="Path to the worktree root directory" env="WORKTREE_ROOT"
-flag "--zone-dir <zone_dir>" help="Path to the zone directory to set up" env="ZONE_DIR"
 '''
 run = """
 mise install
 
-ln -snf "${usage_worktree_root?}/.env.development.local" "${usage_zone_dir?}/"
-ln -snf "${usage_worktree_root?}/lefthook.yml" "${usage_zone_dir?}/"
-ln -snf "${usage_worktree_root?}/CLAUDE.md" "${usage_zone_dir?}/"
-ln -snf "${usage_worktree_root?}/.claude" "${usage_zone_dir?}/"
+ln -snf "${usage_worktree_root?}/.env.development.local" .
+ln -snf "${usage_worktree_root?}/lefthook.yml" .
+ln -snf "${usage_worktree_root?}/CLAUDE.md" .
+ln -snf "${usage_worktree_root?}/.claude" .
 
-ZONE_NAME=$(basename "${usage_zone_dir?}")
+ZONE_NAME=$(basename "$PWD")
 SESSION_NAME="${ZONE_NAME//./_}"
 
-tmux new-session -c "${usage_zone_dir?}" -s "$SESSION_NAME" -d
-tmux new-window -t "$SESSION_NAME:1" -n install -c "${usage_zone_dir?}" -d "mise install && mise run install"
+tmux new-session -c "$PWD" -s "$SESSION_NAME" -d
+tmux new-window -t "$SESSION_NAME:1" -n install -c "$PWD" -d "mise install && mise run install"
 """

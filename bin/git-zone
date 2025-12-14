@@ -85,7 +85,7 @@ run_zone_setup() {
   fi
 
   echo "Running git-configured zone.setup command..."
-  if ! WORKTREE_ROOT="$WORKTREE_ROOT" ZONE_DIR="$ZONE_DIR" bash -c "$setup_command"; then
+  if ! WORKTREE_ROOT="$WORKTREE_ROOT" bash -c "$setup_command"; then
     echo "Warning: zone.setup command failed. Continuing without setup." >&2
   fi
 }
