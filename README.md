@@ -135,7 +135,7 @@ my-project.pr-123/          # Worktree for PR #123
 Pair the hook with [mise](https://mise.jdx.dev/):
 
 ```bash
-git config zone.setup 'ln -sf "$WORKTREE_ROOT/.mise.local.toml" "$ZONE_DIR/.mise.local.toml" && cd "$ZONE_DIR" && mise run zone:setup "$WORKTREE_ROOT" "$ZONE_DIR"'
+git config zone.setup 'ln -sf "$WORKTREE_ROOT/.mise.local.toml" "$ZONE_DIR/" && mise trust "$ZONE_DIR" && mise run zone:setup'
 ```
 
 Example `.mise.local.toml` for the `zone:setup` task:
@@ -144,10 +144,12 @@ See `mise.local.toml.example` for a more complete, multi-step setup definition y
 
 ```toml
 [tasks."zone:setup"]
+usage = '''
+flag "--worktree-root <worktree_root>" help="Path to the worktree root directory" env="WORKTREE_ROOT"
+flag "--zone-dir <zone_dir>" help="Path to the zone directory to set up" env="ZONE_DIR"
+'''
 run = """
-WORKTREE_ROOT="{{arg(i=1)}}"
-ZONE_DIR="{{arg(i=2)}}"
-ln -snf "$WORKTREE_ROOT/.env" "$ZONE_DIR/.env"
+ln -snf "${usage_worktree_root?}/.env" "${usage_zone_dir?}/"
 npm install
 """
 ```
