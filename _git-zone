@@ -1,14 +1,12 @@
-#compdef git
+#compdef git-zone
 
 # zsh completion for git-zone (git subcommand)
 
-_git_zone() {
-    # Get all local branches, remote branches (cleaned), and tags
-    local -a all_refs
-    all_refs=(${(f)"$(git for-each-ref --format='%(refname:short)' refs)"})
+# Get all local branches, remote branches (cleaned), and tags
+local -a all_refs
+all_refs=(${(f)"$(git for-each-ref --format='%(refname:short)' refs 2>/dev/null)"})
 
-    _arguments -C \
-        '(-h --help)'{-h,--help}'[Show help message and exit.]' \
-        '(-c --create)'{-c,--create}'[Create a new branch]:branch name:' \
-        '*::Branch, PR number, or PR URL:_values "refs" $all_refs'
-}
+_arguments -C \
+  '(-h --help)'{-h,--help}'[Show help message and exit.]' \
+  '(-c --create)'{-c,--create}'[Create a new branch]:branch name:' \
+  '*::Branch, PR number, or PR URL:_values "refs" $all_refs'
