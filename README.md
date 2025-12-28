@@ -25,7 +25,7 @@ Unlike `git switch`, git-zone creates separate working directories instead of sw
 ## Arguments
 
 - *ref-or-pr*  
-  Reference to checkout. Can be a branch name, tag, commit hash, PR number, or PR URL. If omitted, uses the current commit.
+  Reference to checkout. Can be a branch name, tag, commit hash, PR number, or PR URL. If omitted, creates a new branch from the current commit (e.g. `zone-abc1234`).
 
 ## Installation
 
@@ -88,10 +88,10 @@ Create worktree from tag:
 git zone v1.2.3
 ```
 
-Use current commit when no reference specified:
+Create a new branch from the current commit when no reference specified:
 
 ```bash
-git zone -c quick-fix
+git zone
 ```
 
 ## Worktree Setup Hooks

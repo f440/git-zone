@@ -10,7 +10,7 @@ usage() {
   echo
   echo "Arguments:"
   echo "  ref-or-pr     Reference (branch, tag, commit), PR number, or PR URL."
-  echo "                If omitted, uses the current commit."
+  echo "                If omitted, creates a new branch from the current commit."
   echo
   echo "Options:"
   echo "  -c, --create <name>  Create a new branch named <name> before switching."
@@ -59,17 +59,38 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Validation ---
-if [[ -z "$REF_OR_PR" ]]; then
-  # If ref-or-pr is not provided, use current commit
-  REF_OR_PR="$(git rev-parse HEAD)"
-  echo "No reference provided, using current commit: $REF_OR_PR"
-fi
-
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "Error: Not inside a git repository."
   exit 1
 fi
-WORKTREE_ROOT="$(git worktree list | awk 'NR==1{print $1}')"
+
+# If ref-or-pr is not provided:
+# - If -c/--create was not provided, create a new branch from the current commit.
+# - If -c/--create was provided, create that branch from the current commit.
+if [[ -z "$REF_OR_PR" ]]; then
+  REF_OR_PR="$(git rev-parse HEAD)"
+
+  if [[ -z "$NEW_BRANCH_NAME" ]]; then
+    SHORT_SHA="$(git rev-parse --short HEAD)"
+    BASE_BRANCH_NAME="zone-$SHORT_SHA"
+    NEW_BRANCH_NAME="$BASE_BRANCH_NAME"
+    n=2
+
+    WORKTREE_ROOT="$(git worktree list | awk 'NR==1{print $1}')"
+    while git show-ref --verify --quiet "refs/heads/$NEW_BRANCH_NAME" || [[ -e "$WORKTREE_ROOT.$NEW_BRANCH_NAME" ]]; do
+      NEW_BRANCH_NAME="${BASE_BRANCH_NAME}-$n"
+      ((n++))
+    done
+
+    echo "No reference provided; creating new branch '$NEW_BRANCH_NAME' from current commit: $REF_OR_PR"
+  else
+    echo "No reference provided, using current commit: $REF_OR_PR"
+  fi
+fi
+
+if [[ -z "$WORKTREE_ROOT" ]]; then
+  WORKTREE_ROOT="$(git worktree list | awk 'NR==1{print $1}')"
+fi
 
 # Detect if input is a PR number or PR URL
 is_pr() {
