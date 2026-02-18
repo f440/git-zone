@@ -131,7 +131,12 @@ if is_pr "$REF_OR_PR"; then
   if [ -n "$NEW_BRANCH_NAME" ]; then
       BRANCH_NAME_FOR_DIR="$NEW_BRANCH_NAME"
   else
-      BRANCH_NAME_FOR_DIR="pr-$PR_NUM"
+      PR_HEAD_BRANCH="$(gh pr view "$PR_NUM" --json headRefName -q .headRefName 2>/dev/null || true)"
+      if [[ -n "$PR_HEAD_BRANCH" ]]; then
+        BRANCH_NAME_FOR_DIR=$(echo "$PR_HEAD_BRANCH" | tr '/' '-')
+      else
+        BRANCH_NAME_FOR_DIR="pr-$PR_NUM"
+      fi
   fi
   ZONE_DIR="$WORKTREE_ROOT.$BRANCH_NAME_FOR_DIR"
 
