@@ -97,6 +97,10 @@ is_pr() {
   [[ "$1" =~ ^[0-9]+$ ]] || [[ "$1" =~ github\.com/.+/pull/[0-9]+ ]]
 }
 
+sanitize_for_zone_dir() {
+  echo "$1" | tr '/' '-'
+}
+
 run_zone_setup() {
   local setup_command
   setup_command="$(git config --get zone.setup 2>/dev/null || true)"
@@ -129,11 +133,11 @@ if is_pr "$REF_OR_PR"; then
   fi
 
   if [ -n "$NEW_BRANCH_NAME" ]; then
-      BRANCH_NAME_FOR_DIR="$NEW_BRANCH_NAME"
+      BRANCH_NAME_FOR_DIR="$(sanitize_for_zone_dir "$NEW_BRANCH_NAME")"
   else
       PR_HEAD_BRANCH="$(gh pr view "$PR_NUM" --json headRefName -q .headRefName 2>/dev/null || true)"
       if [[ -n "$PR_HEAD_BRANCH" ]]; then
-        BRANCH_NAME_FOR_DIR=$(echo "$PR_HEAD_BRANCH" | tr '/' '-')
+        BRANCH_NAME_FOR_DIR="$(sanitize_for_zone_dir "$PR_HEAD_BRANCH")"
       else
         BRANCH_NAME_FOR_DIR="pr-$PR_NUM"
       fi
@@ -167,7 +171,7 @@ else
   # --- Ref (branch, tag, commit) Handling ---
   if [ -n "$NEW_BRANCH_NAME" ]; then
     # Case: git zone <ref> -c <new-branch>
-    BRANCH_NAME_FOR_DIR="$NEW_BRANCH_NAME"
+    BRANCH_NAME_FOR_DIR="$(sanitize_for_zone_dir "$NEW_BRANCH_NAME")"
     ZONE_DIR="$WORKTREE_ROOT.$BRANCH_NAME_FOR_DIR"
     echo "Creating new branch '$NEW_BRANCH_NAME' from '$REF_OR_PR' in '$ZONE_DIR'..."
     git worktree add -b "$NEW_BRANCH_NAME" "$ZONE_DIR" "$REF_OR_PR"
@@ -176,7 +180,7 @@ else
     # Case: git zone <ref>
     # If ref is an existing local branch, use it.
     if git show-ref --verify --quiet "refs/heads/$REF_OR_PR"; then
-        BRANCH_NAME_FOR_DIR="$REF_OR_PR"
+        BRANCH_NAME_FOR_DIR="$(sanitize_for_zone_dir "$REF_OR_PR")"
         ZONE_DIR="$WORKTREE_ROOT.$BRANCH_NAME_FOR_DIR"
         echo "Creating worktree for existing branch '$REF_OR_PR' in '$ZONE_DIR'..."
         git worktree add "$ZONE_DIR" "$REF_OR_PR"
@@ -184,7 +188,7 @@ else
     else
         # If ref is not a local branch (e.g., remote branch, tag, commit), create detached worktree.
         # Sanitize ref for directory name
-        BRANCH_NAME_FOR_DIR=$(echo "$REF_OR_PR" | tr '/' '-')
+        BRANCH_NAME_FOR_DIR="$(sanitize_for_zone_dir "$REF_OR_PR")"
         ZONE_DIR="$WORKTREE_ROOT.$BRANCH_NAME_FOR_DIR"
         echo "Creating detached worktree for '$REF_OR_PR' in '$ZONE_DIR'..."
         git worktree add --detach "$ZONE_DIR" "$REF_OR_PR"
