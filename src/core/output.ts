@@ -2,12 +2,12 @@ import type { WorktreeStatus } from "./types.js";
 
 export function formatWorktreeTable(statuses: WorktreeStatus[]): string {
   const rows = statuses.map((status) => [
-    status.marker,
-    status.branchLabel,
-    status.shortHead,
-    status.upstream,
-    status.divergence,
-    status.dirty,
+    status.current ? "*" : " ",
+    status.branch ?? "detached",
+    status.head.slice(0, 7),
+    status.upstream ?? "-",
+    formatDivergence(status.ahead, status.behind),
+    status.dirty ? "dirty" : "clean",
     status.path,
   ]);
 
@@ -27,4 +27,23 @@ export function formatWorktreeTable(statuses: WorktreeStatus[]): string {
         .trimEnd(),
     )
     .join("\n");
+}
+
+function formatDivergence(
+  ahead: number | null,
+  behind: number | null,
+): string {
+  if (ahead === null || behind === null) {
+    return "-";
+  }
+  if (ahead === 0 && behind === 0) {
+    return "=";
+  }
+  if (ahead > 0 && behind === 0) {
+    return `ahead ${ahead}`;
+  }
+  if (ahead === 0 && behind > 0) {
+    return `behind ${behind}`;
+  }
+  return `ahead ${ahead}, behind ${behind}`;
 }

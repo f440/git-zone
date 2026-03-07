@@ -16,7 +16,7 @@ type ParsedArgs =
   | { kind: "global-help" }
   | { kind: "global-version" }
   | { kind: "add"; target?: string; branch?: string; branchMode?: AddBranchMode; detach: boolean }
-  | { kind: "list" }
+  | { kind: "list"; json: boolean }
   | { kind: "remove"; inputs: string[]; deleteBranch: boolean; force: boolean };
 
 const GLOBAL_HELP = `git-zone
@@ -43,6 +43,7 @@ const LIST_HELP = `git-zone list
 
 Usage:
   git-zone list
+  git-zone list --json
 `;
 
 const REMOVE_HELP = `git-zone remove
@@ -106,6 +107,7 @@ export async function main(argv: string[]): Promise<number> {
         runner: git,
         repo,
         worktrees,
+        format: parsed.json ? "json" : "table",
       });
       process.stdout.write(`${output}\n`);
       return 0;
@@ -239,7 +241,10 @@ function parseAddArgs(args: string[]): ParsedArgs {
 
 function parseListArgs(args: string[]): ParsedArgs {
   if (args.length === 0 || (args.length === 1 && (args[0] === "-h" || args[0] === "--help"))) {
-    return { kind: "list" };
+    return { kind: "list", json: false };
+  }
+  if (args.length === 1 && args[0] === "--json") {
+    return { kind: "list", json: true };
   }
   throw new UsageError(`unknown option: ${args[0]}`);
 }

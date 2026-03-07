@@ -59,6 +59,7 @@ Show all worktrees for the current repository:
 
 ```bash
 git-zone list
+git-zone list --json
 ```
 
 Remove a worktree:
@@ -117,6 +118,8 @@ The output includes:
 - ahead/behind status
 - whether the worktree is clean or dirty
 - the absolute path
+
+Use `--json` for machine-readable output that is easier to consume from tools such as `fzf` and `jq`. The command returns a JSON array of worktree objects.
 
 ### `git-zone remove <name-or-path>...`
 

@@ -6,6 +6,7 @@ export async function runListCommand(options: {
   runner: GitRunner;
   repo: RepoContext;
   worktrees: WorktreeEntry[];
+  format?: "table" | "json";
 }): Promise<string> {
   const sorted = [...options.worktrees].sort((left, right) => {
     if (left.path === options.repo.mainWorktreePath) {
@@ -19,7 +20,11 @@ export async function runListCommand(options: {
 
   const statuses = [];
   for (const worktree of sorted) {
-    statuses.push(await collectWorktreeStatus(options.runner, worktree));
+    statuses.push(await collectWorktreeStatus(options.runner, worktree, options.repo.mainWorktreePath));
+  }
+
+  if (options.format === "json") {
+    return JSON.stringify(statuses, null, 2);
   }
 
   return formatWorktreeTable(statuses);

@@ -297,6 +297,41 @@ describe("integration: add/list/remove", () => {
     expect(output).toContain(path.join(fixture.zoneRoot, "origin-feature-remote"));
   });
 
+  test("lists worktrees as stable JSON for machine consumers", async () => {
+    const fixture = await setupRepositoryFixture();
+    expect(runCli(["add", "origin/feature/remote", "--detach"], fixture.repoPath).exitCode).toBe(0);
+    await writeFile(path.join(fixture.repoPath, "dirty.txt"), "dirty\n");
+
+    const result = runCli(["list", "--json"], fixture.repoPath);
+
+    expect(result.exitCode).toBe(0);
+    const parsed = JSON.parse(result.stdout) as Array<{
+      path: string;
+      zoneName: string | null;
+      current: boolean;
+      main: boolean;
+      branch: string | null;
+      detached: boolean;
+      upstream: string | null;
+      ahead: number | null;
+      behind: number | null;
+      dirty: boolean;
+    }>;
+
+    expect(parsed[0]?.main).toBe(true);
+    expect(parsed[0]?.current).toBe(true);
+    expect(parsed[0]?.path).toBe(fixture.repoPath);
+    expect(parsed[0]?.branch).toBe("main");
+    expect(parsed[0]?.dirty).toBe(true);
+
+    const detached = parsed.find((worktree) => worktree.zoneName === "origin-feature-remote");
+    expect(detached?.detached).toBe(true);
+    expect(detached?.branch).toBeNull();
+    expect(detached?.upstream).toBeNull();
+    expect(detached?.ahead).toBeNull();
+    expect(detached?.behind).toBeNull();
+  });
+
   test("removes worktrees, deletes branches, rejects main removal, and continues on mixed outcomes", async () => {
     const fixture = await setupRepositoryFixture();
     const initial = await repoState(fixture.repoPath);

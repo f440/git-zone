@@ -38,13 +38,20 @@ export type RepoContext = {
 };
 
 export type WorktreeStatus = {
-  marker: "*" | " ";
-  branchLabel: string;
-  shortHead: string;
-  upstream: string;
-  divergence: string;
-  dirty: "clean" | "dirty";
   path: string;
+  zoneName: string | null;
+  current: boolean;
+  main: boolean;
+  branch: string | null;
+  detached: boolean;
+  bare: boolean;
+  locked: boolean;
+  prunable: boolean;
+  head: string;
+  upstream: string | null;
+  ahead: number | null;
+  behind: number | null;
+  dirty: boolean;
 };
 
 export type GitResult = {

@@ -62,18 +62,18 @@ export async function getWorktreeEntries(
 export async function collectWorktreeStatus(
   runner: GitRunner,
   entry: WorktreeEntry,
+  mainWorktreePath: string,
 ): Promise<WorktreeStatus> {
-  const headResult = await runner(["rev-parse", "--short", "HEAD"], {
+  const headResult = await runner(["rev-parse", "HEAD"], {
     cwd: entry.path,
   });
-  const shortHead = headResult.stdout.trim();
+  const head = headResult.stdout.trim();
 
-  let branchLabel = "detached";
-  let upstream = "-";
-  let divergence = "-";
+  let upstream: string | null = null;
+  let ahead: number | null = null;
+  let behind: number | null = null;
 
   if (!entry.detached && entry.branch) {
-    branchLabel = entry.branch;
     const upstreamResult = await runner(
       ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
       { cwd: entry.path, allowFailure: true },
@@ -81,14 +81,13 @@ export async function collectWorktreeStatus(
 
     if (upstreamResult.exitCode === 0) {
       upstream = upstreamResult.stdout.trim();
-      const divergenceResult = await runner(
+      const aheadBehindResult = await runner(
         ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"],
         { cwd: entry.path },
       );
-      const [aheadRaw, behindRaw] = divergenceResult.stdout.trim().split(/\s+/);
-      const ahead = Number.parseInt(aheadRaw ?? "0", 10);
-      const behind = Number.parseInt(behindRaw ?? "0", 10);
-      divergence = formatDivergence(ahead, behind);
+      const [aheadRaw, behindRaw] = aheadBehindResult.stdout.trim().split(/\s+/);
+      ahead = Number.parseInt(aheadRaw ?? "0", 10);
+      behind = Number.parseInt(behindRaw ?? "0", 10);
     }
   }
 
@@ -97,25 +96,21 @@ export async function collectWorktreeStatus(
   });
 
   return {
-    marker: entry.isCurrent ? "*" : " ",
-    branchLabel,
-    shortHead,
-    upstream,
-    divergence,
-    dirty: dirtyResult.stdout.trim() === "" ? "clean" : "dirty",
     path: entry.path,
+    zoneName: path.normalize(entry.path) === path.normalize(mainWorktreePath)
+      ? null
+      : path.basename(entry.path),
+    current: entry.isCurrent,
+    main: path.normalize(entry.path) === path.normalize(mainWorktreePath),
+    branch: entry.branch,
+    detached: entry.detached,
+    bare: entry.bare,
+    locked: entry.locked,
+    prunable: entry.prunable,
+    head,
+    upstream,
+    ahead,
+    behind,
+    dirty: dirtyResult.stdout.trim() !== "",
   };
-}
-
-function formatDivergence(ahead: number, behind: number): string {
-  if (ahead === 0 && behind === 0) {
-    return "=";
-  }
-  if (ahead > 0 && behind === 0) {
-    return `ahead ${ahead}`;
-  }
-  if (ahead === 0 && behind > 0) {
-    return `behind ${behind}`;
-  }
-  return `ahead ${ahead}, behind ${behind}`;
 }
