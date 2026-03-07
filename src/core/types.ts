@@ -1,0 +1,67 @@
+export type ResolvedAddTarget =
+  | { kind: "head"; commit: string }
+  | { kind: "branch"; branch: string; commit: string }
+  | { kind: "remote"; remoteBranch: string; commit: string }
+  | { kind: "tag"; tag: string; commit: string }
+  | { kind: "commit"; rev: string; commit: string }
+  | { kind: "pr"; number: number; commit: string; remote: string };
+
+export type WorktreeEntry = {
+  path: string;
+  head: string;
+  branch: string | null;
+  detached: boolean;
+  bare: boolean;
+  locked: boolean;
+  prunable: boolean;
+  isCurrent: boolean;
+};
+
+export type RemoveResolution =
+  | { kind: "path"; input: string; worktree: WorktreeEntry }
+  | { kind: "branch"; input: string; worktree: WorktreeEntry; branch: string }
+  | { kind: "zone"; input: string; worktree: WorktreeEntry; zoneName: string };
+
+export type RepoContext = {
+  cwd: string;
+  currentWorktreePath: string;
+  mainWorktreePath: string;
+  commonGitDir: string;
+  repoName: string;
+  repoParent: string;
+};
+
+export type WorktreeStatus = {
+  marker: "*" | " ";
+  branchLabel: string;
+  shortHead: string;
+  upstream: string;
+  divergence: string;
+  dirty: "clean" | "dirty";
+  path: string;
+};
+
+export type GitResult = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  command: string[];
+};
+
+export type GitRunner = (
+  args: string[],
+  options?: {
+    cwd?: string;
+    allowFailure?: boolean;
+  },
+) => Promise<GitResult>;
+
+export type ParsedGitHubRepo = {
+  host: string;
+  owner: string;
+  repo: string;
+};
+
+export type ParsedPullRequestUrl = ParsedGitHubRepo & {
+  number: number;
+};

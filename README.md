@@ -1,159 +1,159 @@
 # git-zone
 
-Create git worktrees for branches, PRs, and refs
+`git-zone` is a command-line tool for creating, listing, and removing Git worktrees with a simpler workflow than raw `git worktree` commands.
 
-## Synopsis
+It is designed for the common cases developers reach for every day:
 
-```
-git zone [<ref-or-pr>] [-c|--create <branch-name>]
-```
-
-## Description
-
-git-zone creates isolated git worktrees for development work. It wraps `git-worktree` with convenient shortcuts for branches, pull requests, tags, and commits.
-
-Unlike `git switch`, git-zone creates separate working directories instead of switching the current repository state. Each worktree maintains its own working directory and index while sharing the same Git history.
-
-## Options
-
-- **-c**, **--create** *branch-name*  
-  Create a new branch named *branch-name* before switching to the worktree.
-
-- **-h**, **--help**  
-  Show usage information and exit.
-
-## Arguments
-
-- *ref-or-pr*  
-  Reference to checkout. Can be a branch name, tag, commit hash, PR number, or PR URL. If omitted, creates a new branch from the current commit (e.g. `zone-abc1234`).
+- open a worktree for an existing branch
+- create a new branch in its own worktree
+- inspect all worktrees in a repository at a glance
+- remove a worktree by path, branch name, or directory name
+- open a worktree from a GitHub pull request, tag, or commit
 
 ## Installation
 
-Place the git-zone script (located at `bin/git-zone`) in a directory within your PATH. The script will be available as both `git-zone` and `git zone`.
+Build the CLI and install it from this repository:
 
 ```bash
-curl -O https://raw.githubusercontent.com/f440/git-zone/main/bin/git-zone
-chmod +x git-zone
-mv git-zone /usr/local/bin/
+npm install
+bun run build
+npm install -g .
 ```
 
-For zsh completion, copy `_git-zone` to your completions directory:
+After installation, the command is available as:
 
 ```bash
-curl -O https://raw.githubusercontent.com/f440/git-zone/main/_git-zone
-mv _git-zone ~/.zsh/completions/
+git-zone
 ```
+
+## Quick Start
+
+Create a worktree from the current `HEAD`:
+
+```bash
+git-zone add
+```
+
+Create a worktree for an existing branch:
+
+```bash
+git-zone add feature/login-fix
+```
+
+Create a new branch from `main` in a new worktree:
+
+```bash
+git-zone add main -c spike/new-idea
+```
+
+Open a pull request in its own worktree:
+
+```bash
+git-zone add 123
+git-zone add https://github.com/owner/repo/pull/123
+```
+
+Show all worktrees for the current repository:
+
+```bash
+git-zone list
+```
+
+Remove a worktree:
+
+```bash
+git-zone remove pr-123
+git-zone remove /full/path/to/worktree
+git-zone remove feature/login-fix -b
+```
+
+## Commands
+
+### `git-zone add [<target>]`
+
+Creates a new worktree for the current repository.
+
+If no target is provided, `git-zone` creates a detached worktree from the current `HEAD`.
+
+The target can be:
+
+- a local branch
+- a remote-tracking branch such as `origin/main`
+- a tag
+- a commit or revision
+- a GitHub pull request number
+- a GitHub pull request URL
+
+When the target is a local branch, the new worktree checks out that branch.
+When the target is a remote branch, tag, commit, pull request, or the current `HEAD`, the new worktree is created in detached HEAD state.
+
+Use `-c` or `--create-branch` to create a new local branch from the resolved target:
+
+```bash
+git-zone add main -c spike/new-idea
+git-zone add 123 -c fix/pr-123
+git-zone add -c spike/current-head
+```
+
+New worktrees are created under a `.zone` directory next to the main repository, grouped by repository name.
+
+### `git-zone list`
+
+Shows every worktree registered for the current repository.
+
+The output includes:
+
+- the current worktree marker
+- the checked out branch or `detached`
+- the current short commit SHA
+- upstream branch information
+- ahead/behind status
+- whether the worktree is clean or dirty
+- the absolute path
+
+### `git-zone remove <name-or-path>...`
+
+Removes one or more worktrees from the current repository.
+
+Each target can be resolved by:
+
+- full path
+- local branch name
+- worktree directory name
+
+Use `-b` or `--delete-branch` to delete the corresponding local branch after removing the worktree.
+Use `-f` or `--force` to force removal when Git would normally refuse it.
 
 ## Examples
 
-Create worktree for existing branch:
+Create worktrees from different targets:
 
 ```bash
-git zone feature-branch
+git-zone add main
+git-zone add origin/main
+git-zone add v1.2.3
+git-zone add abc1234
+git-zone add 123
 ```
 
-Create worktree for remote branch:
+Create a branch directly into a new worktree:
 
 ```bash
-git zone origin/main
+git-zone add origin/main -c feature/from-remote
 ```
 
-Create new branch from current commit:
+Remove by branch name or directory name:
 
 ```bash
-git zone -c new-feature
+git-zone remove feature/login-fix
+git-zone remove pr-123
 ```
 
-Create new branch from specific commit:
+## Help
 
 ```bash
-git zone abc1234 -c fix-bug
+git-zone --help
+git-zone add --help
+git-zone list --help
+git-zone remove --help
 ```
-
-Checkout PR by number:
-
-```bash
-git zone 123
-```
-
-Checkout PR by URL:
-
-```bash
-git zone https://github.com/owner/repo/pull/123
-```
-
-Create worktree from tag:
-
-```bash
-git zone v1.2.3
-```
-
-Create a new branch from the current commit when no reference specified:
-
-```bash
-git zone
-```
-
-## Worktree Setup Hooks
-
-After creating a worktree, git-zone checks the repository's git config for a `zone.setup` entry. When present, the configured shell snippet runs with `WORKTREE_ROOT` exported, and the current directory set to the newly created worktree, so you can link dotfiles, install dependencies, or launch tooling inside the worktree.
-
-Simple example:
-
-```bash
-git config zone.setup 'ln -snf "$WORKTREE_ROOT/.env" . && npm install'
-```
-
-Use `git config --global` if you want a default hook for every repository; per-repo configs override the global one.
-
-## Exit Status
-
-git-zone exits with status 0 on success, 1 on error.
-
-## Dependencies
-
-- **git** - Required for all operations
-- **gh** - Required for pull request operations
-
-## Environment Variables
-
-`zone.setup` hooks receive one environment variable:
-
-- `WORKTREE_ROOT` – The repository path returned by `git worktree list`.
-
-The hook runs with the current directory set to the worktree directory (use `$PWD` if you need the absolute path).
-
-## Integration Examples
-
-Directory layout after running git-zone:
-
-```
-my-project/                 # Main repository
-my-project.feature-branch/  # Worktree for feature-branch
-my-project.pr-123/          # Worktree for PR #123
-```
-
-Pair the hook with [mise](https://mise.jdx.dev/):
-
-```bash
-git config zone.setup 'ln -sf "$WORKTREE_ROOT/.mise.local.toml" . && mise trust -q "$PWD" && mise run zone:setup'
-```
-
-Example `.mise.local.toml` for the `zone:setup` task:
-
-See `mise.local.toml.example` for a more complete, multi-step setup definition you can adapt to your project.
-
-```toml
-[tasks."zone:setup"]
-usage = '''
-flag "--worktree-root <worktree_root>" help="Path to the worktree root directory" env="WORKTREE_ROOT"
-'''
-run = """
-ln -snf "${usage_worktree_root?}/.env" .
-npm install
-"""
-```
-
-## See Also
-
-git-worktree(1), git-switch(1), gh-pr-checkout(1)

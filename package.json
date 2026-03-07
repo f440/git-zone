@@ -1,0 +1,15 @@
+{
+  "name": "git-zone",
+  "version": "0.1.0",
+  "description": "CLI for managing git worktrees by branch, ref, and pull request",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "git-zone": "bin/git-zone"
+  },
+  "scripts": {
+    "build": "bun build ./src/cli.ts --target=node --outfile=./dist/cli.js",
+    "test": "bun test",
+    "check": "bun test && bun run build"
+  }
+}
