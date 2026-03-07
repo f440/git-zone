@@ -89,7 +89,6 @@ export type HookEvent = "post-add" | "post-remove";
 
 export type HookContext = {
   event: HookEvent;
-  repoRoot: string;
   mainWorktree: string;
   worktreePath: string;
   zoneName: string;

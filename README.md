@@ -150,7 +150,6 @@ Hook commands are executed by `/bin/sh -c` from the main worktree directory.
 Hooks receive the following environment variables:
 
 - `ZONE_EVENT`
-- `ZONE_REPO_ROOT`
 - `ZONE_MAIN_WORKTREE`
 - `ZONE_WORKTREE_PATH`
 - `ZONE_ZONE_NAME`

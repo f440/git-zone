@@ -359,7 +359,7 @@ describe("integration: add/list/remove", () => {
       path.join(fixture.repoPath, "scripts", "zone-post-add"),
       `#!/bin/sh
 set -eu
-printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$ZONE_MAIN_WORKTREE" "$ZONE_WORKTREE_PATH" "$ZONE_ZONE_NAME" "$ZONE_BRANCH" > "${outputPath}"
+printf '%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_MAIN_WORKTREE" "$ZONE_WORKTREE_PATH" "$ZONE_ZONE_NAME" "$ZONE_BRANCH" > "${outputPath}"
 `,
     );
     spawnGit(["config", "zone.hooks.postAdd", "./scripts/zone-post-add"], fixture.repoPath);
@@ -373,10 +373,9 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$Z
     expect(hookOutput[0]).toBe(fixture.repoPath);
     expect(hookOutput[1]).toBe("post-add");
     expect(hookOutput[2]).toBe(fixture.repoPath);
-    expect(hookOutput[3]).toBe(fixture.repoPath);
-    expect(hookOutput[4]).toBe(path.join(fixture.zoneRoot, "feature-hooked"));
-    expect(hookOutput[5]).toBe("feature-hooked");
-    expect(hookOutput[6]).toBe("feature/hooked");
+    expect(hookOutput[3]).toBe(path.join(fixture.zoneRoot, "feature-hooked"));
+    expect(hookOutput[4]).toBe("feature-hooked");
+    expect(hookOutput[5]).toBe("feature/hooked");
   });
 
   test("fails add when postAdd hook fails but leaves the worktree in place", async () => {
@@ -410,7 +409,7 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$Z
       path.join(fixture.repoPath, "scripts", "zone-post-remove"),
       `#!/bin/sh
 set -eu
-printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$ZONE_MAIN_WORKTREE" "$ZONE_WORKTREE_PATH" "$ZONE_ZONE_NAME" "$ZONE_BRANCH" > "${outputPath}"
+printf '%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_MAIN_WORKTREE" "$ZONE_WORKTREE_PATH" "$ZONE_ZONE_NAME" "$ZONE_BRANCH" > "${outputPath}"
 `,
     );
     spawnGit(["config", "zone.hooks.postRemove", "./scripts/zone-post-remove"], fixture.repoPath);
@@ -423,9 +422,10 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$Z
     const hookOutput = (await fs.readFile(outputPath, "utf8")).trim().split("\n");
     expect(hookOutput[0]).toBe(fixture.repoPath);
     expect(hookOutput[1]).toBe("post-remove");
-    expect(hookOutput[4]).toBe(path.join(fixture.zoneRoot, "feature-remove-hook"));
-    expect(hookOutput[5]).toBe("feature-remove-hook");
-    expect(hookOutput[6]).toBe("feature/remove-hook");
+    expect(hookOutput[2]).toBe(fixture.repoPath);
+    expect(hookOutput[3]).toBe(path.join(fixture.zoneRoot, "feature-remove-hook"));
+    expect(hookOutput[4]).toBe("feature-remove-hook");
+    expect(hookOutput[5]).toBe("feature/remove-hook");
     await expect(fs.access(path.join(fixture.zoneRoot, "feature-remove-hook"))).rejects.toThrow();
   });
 

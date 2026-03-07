@@ -87,7 +87,6 @@ export async function runAddCommand(options: {
       ],
       hookContext: {
         event: "post-add",
-        repoRoot: repo.mainWorktreePath,
         mainWorktree: repo.mainWorktreePath,
         worktreePath: zonePath,
         zoneName,
@@ -107,7 +106,6 @@ export async function runAddCommand(options: {
       ],
       hookContext: {
         event: "post-add",
-        repoRoot: repo.mainWorktreePath,
         mainWorktree: repo.mainWorktreePath,
         worktreePath: zonePath,
         zoneName,
@@ -127,7 +125,6 @@ export async function runAddCommand(options: {
     ],
     hookContext: {
       event: "post-add",
-      repoRoot: repo.mainWorktreePath,
       mainWorktree: repo.mainWorktreePath,
       worktreePath: zonePath,
       zoneName,

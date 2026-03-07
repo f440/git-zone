@@ -37,7 +37,6 @@ export async function getHookCommand(
 export function buildHookEnvironment(context: HookContext): Record<string, string> {
   return {
     ZONE_EVENT: context.event,
-    ZONE_REPO_ROOT: context.repoRoot,
     ZONE_MAIN_WORKTREE: context.mainWorktree,
     ZONE_WORKTREE_PATH: context.worktreePath,
     ZONE_ZONE_NAME: context.zoneName,

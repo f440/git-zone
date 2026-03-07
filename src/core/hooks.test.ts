@@ -21,7 +21,6 @@ function createFakeRunner(resolver: (args: string[]) => GitResult): GitRunner {
 
 const context: HookContext = {
   event: "post-add",
-  repoRoot: "/repo",
   mainWorktree: "/repo",
   worktreePath: "/repo/.zone/repo/pr-123",
   zoneName: "pr-123",
@@ -56,7 +55,6 @@ describe("buildHookEnvironment", () => {
       branch: "feature/login-fix",
     })).toEqual({
       ZONE_EVENT: "post-add",
-      ZONE_REPO_ROOT: "/repo",
       ZONE_MAIN_WORKTREE: "/repo",
       ZONE_WORKTREE_PATH: "/repo/.zone/repo/pr-123",
       ZONE_ZONE_NAME: "pr-123",

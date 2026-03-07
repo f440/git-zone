@@ -53,7 +53,6 @@ export async function runRemoveCommand(options: {
         lines,
         hookContext: {
           event: "post-remove",
-          repoRoot: repo.mainWorktreePath,
           mainWorktree: repo.mainWorktreePath,
           worktreePath: targetPath,
           zoneName: resolution.kind === "zone" ? resolution.zoneName : path.basename(targetPath),
