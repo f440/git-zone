@@ -46,8 +46,6 @@ export async function buildZonePath(
 
 function zoneNameFromTarget(target: ResolvedAddTarget): string {
   switch (target.kind) {
-    case "head":
-      return `head-${target.commit.slice(0, 7)}`;
     case "branch":
       return target.branch;
     case "remote":

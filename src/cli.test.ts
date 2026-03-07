@@ -16,9 +16,44 @@ describe("cli add parsing", () => {
       expect(exitCode).toBe(0);
       expect(stdout.join("")).toContain("git-zone add <target> -b <branch-name>");
       expect(stdout.join("")).toContain("git-zone add <target> -B <branch-name>");
-      expect(stdout.join("")).toContain("git-zone add [<target>] --detach");
+      expect(stdout.join("")).toContain("git-zone add <target> --detach");
+      expect(stdout.join("")).toContain("git-zone add <target> -d");
     } finally {
       process.stdout.write = originalWrite;
+    }
+  });
+
+  test("rejects add without a target", async () => {
+    const stderr: string[] = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      const exitCode = await main(["add"]);
+      expect(exitCode).toBe(1);
+      expect(stderr.join("")).toContain("add requires a target; implicit HEAD is not supported");
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+  });
+
+  test("accepts -d as a detach shorthand", async () => {
+    const stderr: string[] = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      const exitCode = await main(["add", "-d"]);
+      expect(exitCode).toBe(1);
+      expect(stderr.join("")).toContain("add requires a target; implicit HEAD is not supported");
+    } finally {
+      process.stderr.write = originalWrite;
     }
   });
 });

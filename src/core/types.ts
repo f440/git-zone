@@ -1,5 +1,4 @@
 export type ResolvedAddTarget =
-  | { kind: "head"; commit: string }
   | { kind: "branch"; branch: string; commit: string }
   | { kind: "remote"; remoteBranch: string; commit: string; guessedLocalBranch?: string }
   | { kind: "tag"; tag: string; commit: string }

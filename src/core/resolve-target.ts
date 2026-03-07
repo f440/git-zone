@@ -1,4 +1,4 @@
-import { AmbiguousTargetError, TargetNotFoundError } from "./errors.js";
+import { AmbiguousTargetError, TargetNotFoundError, UsageError } from "./errors.js";
 import { resolvePullRequestMetadata } from "./github-pr.js";
 import type { GitRunner, RepoContext, ResolvedAddTarget } from "./types.js";
 
@@ -62,10 +62,9 @@ export async function resolveAddTarget(
   target?: string,
 ): Promise<ResolvedAddTarget> {
   if (!target) {
-    const headResult = await runner(["rev-parse", "HEAD^{commit}"], {
-      cwd: repo.currentWorktreePath,
+    throw new UsageError("add requires a target; implicit HEAD is not supported", {
+      details: ["hint: use an explicit target such as 'HEAD --detach' or 'HEAD -b <branch>'"],
     });
-    return { kind: "head", commit: headResult.stdout.trim() };
   }
 
   if (target.startsWith("http://") || target.startsWith("https://")) {

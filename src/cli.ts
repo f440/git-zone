@@ -24,7 +24,7 @@ const GLOBAL_HELP = `git-zone
 Usage:
   git-zone --help
   git-zone --version
-  git-zone add [<target>] [-b <branch> | -B <branch>] [--detach]
+  git-zone add <target> [-b <branch> | -B <branch>] [--detach | -d]
   git-zone list
   git-zone remove <name-or-path>... [-b|--delete-branch] [-f|--force]
 `;
@@ -32,11 +32,11 @@ Usage:
 const ADD_HELP = `git-zone add
 
 Usage:
-  git-zone add
   git-zone add <target>
   git-zone add <target> -b <branch-name>
   git-zone add <target> -B <branch-name>
-  git-zone add [<target>] --detach
+  git-zone add <target> --detach
+  git-zone add <target> -d
 `;
 
 const LIST_HELP = `git-zone list
@@ -198,7 +198,7 @@ function parseAddArgs(args: string[]): ParsedArgs {
     if (arg === "-h" || arg === "--help") {
       return { kind: "add", detach: false };
     }
-    if (arg === "--detach") {
+    if (arg === "--detach" || arg === "-d") {
       detach = true;
       continue;
     }
@@ -226,6 +226,12 @@ function parseAddArgs(args: string[]): ParsedArgs {
 
   if (detach && branch) {
     throw new UsageError("--detach cannot be used with -b or -B");
+  }
+
+  if (!target) {
+    throw new UsageError("add requires a target; implicit HEAD is not supported", {
+      details: ["hint: use an explicit target such as 'HEAD --detach' or 'HEAD -b <branch>'"],
+    });
   }
 
   return { kind: "add", target, branch, branchMode, detach };

@@ -28,10 +28,10 @@ git-zone
 
 ## Quick Start
 
-Create a worktree from the current `HEAD`:
+Create a detached worktree from the current `HEAD` explicitly:
 
 ```bash
-git-zone add
+git-zone add HEAD --detach
 ```
 
 Create a worktree for an existing branch:
@@ -71,11 +71,9 @@ git-zone remove feature/login-fix -b
 
 ## Commands
 
-### `git-zone add [<target>]`
+### `git-zone add <target>`
 
 Creates a new worktree for the current repository.
-
-If no target is provided, `git-zone` creates a detached worktree from the current `HEAD`.
 
 The target can be:
 
@@ -89,14 +87,16 @@ The target can be:
 When the target is a local branch, the new worktree checks out that branch.
 When the target is a pull request, the new worktree creates and checks out a local branch with the pull request head branch name by default.
 When the target is a plain branch name and only a matching remote-tracking branch exists, `git-zone` creates a local tracking branch by default.
-When the target is an explicit remote branch, tag, commit, or the current `HEAD`, the new worktree is created in detached HEAD state unless you choose a branch explicitly.
+When the target is an explicit remote branch, tag, commit, or `HEAD`, the new worktree is created in detached HEAD state unless you choose a branch explicitly.
 
-Use `-b` to create a new branch, `-B` to reset or reuse a branch name, and `--detach` to force detached HEAD:
+Use `-b` to create a new branch, `-B` to reset or reuse a branch name, and `--detach` or `-d` to force detached HEAD:
 
 ```bash
 git-zone add main -b spike/new-idea
 git-zone add 123 -b fix/pr-123
 git-zone add origin/main -B feature/from-remote
+git-zone add HEAD --detach
+git-zone add HEAD -d
 git-zone add 123 --detach
 ```
 

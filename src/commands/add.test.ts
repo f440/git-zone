@@ -149,12 +149,12 @@ describe("runAddCommand", () => {
     const result = await runAddCommand({
       runner,
       repo,
-      target: { kind: "head", commit: "abc1234" },
+      target: { kind: "commit", rev: "HEAD", commit: "abc1234" },
       worktrees: [],
       detach: true,
     });
 
     expect(result.lines[1]).toBe("checked out: detached at abc1234");
-    expect(commands).toContain(`worktree add --detach ${path.join(repo.repoParent, ".zone", "repo", "head-abc1234")} abc1234`);
+    expect(commands).toContain(`worktree add --detach ${path.join(repo.repoParent, ".zone", "repo", "commit-abc1234")} abc1234`);
   });
 });
