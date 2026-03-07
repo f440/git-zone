@@ -36,7 +36,14 @@ describe("buildZonePath", () => {
   test("uses create branch name when present", async () => {
     const repoParent = await fs.mkdtemp(path.join(os.tmpdir(), "git-zone-path-"));
     const repo = createRepoContext(repoParent);
-    const target: ResolvedAddTarget = { kind: "pr", number: 123, commit: "abc1234", remote: "origin" };
+    const target: ResolvedAddTarget = {
+      kind: "pr",
+      number: 123,
+      commit: "abc1234",
+      remote: "origin",
+      repository: { host: "github.com", owner: "f440", repo: "repo" },
+      headBranch: "feature/login-fix",
+    };
 
     const result = await buildZonePath(repo, target, "fix/pr-123");
 

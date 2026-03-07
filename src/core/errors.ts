@@ -27,9 +27,9 @@ export class CliError extends Error {
     }
 
     if (this.gitResult) {
-      lines.push(`command: git ${this.gitResult.command.slice(1).join(" ")}`);
+      lines.push(`command: ${this.gitResult.command.join(" ")}`);
       if (this.gitResult.stderr.trim() !== "") {
-        lines.push(`git stderr: ${this.gitResult.stderr.trim()}`);
+        lines.push(`stderr: ${this.gitResult.stderr.trim()}`);
       }
     }
 

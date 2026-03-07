@@ -4,7 +4,14 @@ export type ResolvedAddTarget =
   | { kind: "remote"; remoteBranch: string; commit: string }
   | { kind: "tag"; tag: string; commit: string }
   | { kind: "commit"; rev: string; commit: string }
-  | { kind: "pr"; number: number; commit: string; remote: string };
+  | {
+      kind: "pr";
+      number: number;
+      commit: string;
+      remote: string;
+      repository: ParsedGitHubRepo;
+      headBranch: string;
+    };
 
 export type WorktreeEntry = {
   path: string;
@@ -64,6 +71,19 @@ export type ParsedGitHubRepo = {
 
 export type ParsedPullRequestUrl = ParsedGitHubRepo & {
   number: number;
+};
+
+export type GitHubRemote = {
+  name: string;
+  repository: ParsedGitHubRepo;
+};
+
+export type PullRequestMetadata = {
+  number: number;
+  repository: ParsedGitHubRepo;
+  remote: string;
+  headBranch: string;
+  headCommit: string;
 };
 
 export type HookEvent = "post-add" | "post-remove";

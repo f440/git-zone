@@ -1,5 +1,19 @@
+import { spawn } from "node:child_process";
+
 import { PullRequestResolutionError } from "./errors.js";
-import type { GitRunner, ParsedGitHubRepo, ParsedPullRequestUrl, RepoContext } from "./types.js";
+import type {
+  GitHubRemote,
+  GitRunner,
+  ParsedGitHubRepo,
+  ParsedPullRequestUrl,
+  PullRequestMetadata,
+  RepoContext,
+} from "./types.js";
+
+export type PullRequestViewer = (
+  number: number,
+  repository: ParsedGitHubRepo,
+) => Promise<{ headRefName: string; headRefOid: string }>;
 
 export function parseGitHubRepoUrl(remoteUrl: string): ParsedGitHubRepo {
   const httpsMatch = remoteUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
@@ -20,7 +34,7 @@ export function parseGitHubRepoUrl(remoteUrl: string): ParsedGitHubRepo {
     };
   }
 
-  throw new PullRequestResolutionError("origin is not a supported GitHub repository", {
+  throw new PullRequestResolutionError("remote is not a supported GitHub repository", {
     details: [`remote URL: ${remoteUrl}`],
   });
 }
@@ -56,75 +70,280 @@ export function parsePullRequestUrl(input: string): ParsedPullRequestUrl {
   };
 }
 
-export async function resolvePullRequestCommit(
+export async function listGitHubRemotes(
   runner: GitRunner,
-  repo: RepoContext,
-  number: number,
-  expectedRepo?: ParsedGitHubRepo,
-): Promise<{ commit: string; remote: string }> {
-  const remoteName = "origin";
-  const remoteUrlResult = await runner(["remote", "get-url", remoteName], {
-    cwd: repo.currentWorktreePath,
+  cwd: string,
+): Promise<GitHubRemote[]> {
+  const result = await runner(["config", "--get-regexp", "^remote\\..*\\.url$"], {
+    cwd,
     allowFailure: true,
   });
 
-  if (remoteUrlResult.exitCode !== 0) {
-    throw new PullRequestResolutionError("origin remote is required to resolve pull requests");
+  if (result.exitCode !== 0 || result.stdout.trim() === "") {
+    return [];
   }
 
-  const originRepo = parseGitHubRepoUrl(remoteUrlResult.stdout.trim());
-  if (
-    expectedRepo &&
-    (expectedRepo.owner !== originRepo.owner || expectedRepo.repo !== originRepo.repo)
-  ) {
-    throw new PullRequestResolutionError("pull request URL repository does not match origin", {
-      details: [
-        `origin: ${originRepo.owner}/${originRepo.repo}`,
-        `url: ${expectedRepo.owner}/${expectedRepo.repo}`,
-      ],
-    });
-  }
+  const remotes: GitHubRemote[] = [];
+  for (const line of result.stdout.trim().split("\n")) {
+    const [key, ...valueParts] = line.split(/\s+/);
+    const value = valueParts.join(" ");
+    const match = key?.match(/^remote\.([^.]+)\.url$/);
+    if (!match || value === "") {
+      continue;
+    }
 
-  const ref = `refs/pull/${number}/head`;
-  const lsRemote = await runner(["ls-remote", remoteName, ref], {
-    cwd: repo.currentWorktreePath,
-    allowFailure: true,
-  });
-
-  if (lsRemote.exitCode === 0 && lsRemote.stdout.trim() !== "") {
-    const commit = lsRemote.stdout.trim().split(/\s+/)[0]!;
-    const catFile = await runner(["cat-file", "-e", `${commit}^{commit}`], {
-      cwd: repo.currentWorktreePath,
-      allowFailure: true,
-    });
-    if (catFile.exitCode === 0) {
-      return { commit, remote: remoteName };
+    try {
+      remotes.push({
+        name: match[1]!,
+        repository: parseGitHubRepoUrl(value),
+      });
+    } catch {
+      // Ignore non-GitHub remotes.
     }
   }
 
+  return remotes;
+}
+
+export async function listBaseResolvedRemoteNames(
+  runner: GitRunner,
+  cwd: string,
+): Promise<string[]> {
+  const result = await runner(["config", "--get-regexp", "^remote\\..*\\.gh-resolved$"], {
+    cwd,
+    allowFailure: true,
+  });
+
+  if (result.exitCode !== 0 || result.stdout.trim() === "") {
+    return [];
+  }
+
+  return result.stdout
+    .trim()
+    .split("\n")
+    .map((line) => line.split(/\s+/))
+    .filter((parts) => parts[1] === "base")
+    .map((parts) => parts[0]?.match(/^remote\.([^.]+)\.gh-resolved$/)?.[1] ?? "")
+    .filter((name) => name !== "");
+}
+
+export async function resolvePullRequestRemoteForNumber(
+  runner: GitRunner,
+  cwd: string,
+): Promise<GitHubRemote> {
+  const remotes = await listGitHubRemotes(runner, cwd);
+  const baseResolved = await listBaseResolvedRemoteNames(runner, cwd);
+  const baseMatches = remotes.filter((remote) => baseResolved.includes(remote.name));
+
+  if (baseMatches.length === 1) {
+    return baseMatches[0]!;
+  }
+
+  if (baseMatches.length > 1) {
+    throw new PullRequestResolutionError("multiple remotes are marked as gh-resolved=base", {
+      details: baseMatches.map((remote) => `remote: ${remote.name}`),
+    });
+  }
+
+  const origin = remotes.find((remote) => remote.name === "origin");
+  if (!origin) {
+    throw new PullRequestResolutionError("origin remote is required to resolve pull requests");
+  }
+
+  return origin;
+}
+
+export async function resolvePullRequestRemoteForUrl(
+  runner: GitRunner,
+  cwd: string,
+  repository: ParsedGitHubRepo,
+): Promise<GitHubRemote> {
+  const remotes = await listGitHubRemotes(runner, cwd);
+  const matches = remotes.filter(
+    (remote) =>
+      remote.repository.owner === repository.owner
+      && remote.repository.repo === repository.repo
+      && remote.repository.host === repository.host,
+  );
+
+  if (matches.length === 1) {
+    return matches[0]!;
+  }
+
+  if (matches.length === 0) {
+    throw new PullRequestResolutionError("pull request URL does not match any GitHub remote in this repository", {
+      details: [`url repository: ${repository.owner}/${repository.repo}`],
+    });
+  }
+
+  const baseResolved = await listBaseResolvedRemoteNames(runner, cwd);
+  const baseMatches = matches.filter((remote) => baseResolved.includes(remote.name));
+  if (baseMatches.length === 1) {
+    return baseMatches[0]!;
+  }
+
+  if (baseMatches.length > 1) {
+    throw new PullRequestResolutionError("multiple matching remotes are marked as gh-resolved=base", {
+      details: baseMatches.map((remote) => `remote: ${remote.name}`),
+    });
+  }
+
+  throw new PullRequestResolutionError("pull request URL matches multiple remotes", {
+    details: matches.map((remote) => `remote: ${remote.name}`),
+  });
+}
+
+export const viewPullRequestWithGh: PullRequestViewer = async (number, repository) => {
+  const repoSelector = `${repository.owner}/${repository.repo}`;
+
+  const result = await new Promise<{
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+    error?: NodeJS.ErrnoException;
+  }>((resolve) => {
+    const child = spawn("gh", [
+      "pr",
+      "view",
+      String(number),
+      "--repo",
+      repoSelector,
+      "--json",
+      "headRefName,headRefOid",
+    ], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+
+    child.on("error", (error) => {
+      resolve({ stdout, stderr, exitCode: 1, error });
+    });
+    child.on("close", (exitCode) => {
+      resolve({ stdout, stderr, exitCode: exitCode ?? 1 });
+    });
+  });
+
+  if (result.error?.code === "ENOENT") {
+    throw new PullRequestResolutionError("gh CLI is required to resolve pull requests");
+  }
+
+  if (result.exitCode !== 0) {
+    throw new PullRequestResolutionError(`failed to load pull request #${number}`, {
+      details: [`repository: ${repoSelector}`],
+      gitResult: {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+        command: ["gh", "pr", "view", String(number), "--repo", repoSelector, "--json", "headRefName,headRefOid"],
+      },
+    });
+  }
+
+  let parsed: { headRefName?: string; headRefOid?: string };
+  try {
+    parsed = JSON.parse(result.stdout) as { headRefName?: string; headRefOid?: string };
+  } catch {
+    throw new PullRequestResolutionError(`failed to parse pull request metadata for #${number}`, {
+      details: [`repository: ${repoSelector}`],
+    });
+  }
+
+  if (!parsed.headRefName || !parsed.headRefOid) {
+    throw new PullRequestResolutionError(`pull request metadata is incomplete for #${number}`, {
+      details: [`repository: ${repoSelector}`],
+    });
+  }
+
+  return {
+    headRefName: parsed.headRefName,
+    headRefOid: parsed.headRefOid,
+  };
+};
+
+export async function fetchPullRequestCommit(
+  runner: GitRunner,
+  cwd: string,
+  remoteName: string,
+  number: number,
+): Promise<string> {
+  const ref = `refs/pull/${number}/head`;
   const fetchResult = await runner(["fetch", remoteName, ref], {
-    cwd: repo.currentWorktreePath,
+    cwd,
     allowFailure: true,
   });
 
   if (fetchResult.exitCode !== 0) {
-    throw new PullRequestResolutionError(`failed to resolve pull request #${number}`, {
-      details: [`tried: git ls-remote ${remoteName} ${ref}`, `tried: git fetch ${remoteName} ${ref}`],
+    throw new PullRequestResolutionError(`failed to fetch pull request #${number}`, {
+      details: [`tried: git fetch ${remoteName} ${ref}`],
       gitResult: fetchResult,
     });
   }
 
   const commitResult = await runner(["rev-parse", "FETCH_HEAD^{commit}"], {
-    cwd: repo.currentWorktreePath,
+    cwd,
     allowFailure: true,
   });
 
   if (commitResult.exitCode !== 0 || commitResult.stdout.trim() === "") {
-    throw new PullRequestResolutionError(`failed to resolve pull request #${number}`, {
+    throw new PullRequestResolutionError(`failed to resolve fetched pull request #${number}`, {
       details: [`tried: git fetch ${remoteName} ${ref}`, "FETCH_HEAD did not resolve to a commit"],
       gitResult: commitResult,
     });
   }
 
-  return { commit: commitResult.stdout.trim(), remote: remoteName };
+  return commitResult.stdout.trim();
+}
+
+export async function resolvePullRequestMetadata(
+  runner: GitRunner,
+  repo: RepoContext,
+  input: string,
+  viewer: PullRequestViewer = viewPullRequestWithGh,
+): Promise<PullRequestMetadata> {
+  let number: number;
+  let remote: GitHubRemote;
+  let repository: ParsedGitHubRepo;
+
+  if (/^\d+$/.test(input)) {
+    number = Number.parseInt(input, 10);
+    remote = await resolvePullRequestRemoteForNumber(runner, repo.currentWorktreePath);
+    repository = remote.repository;
+  } else {
+    const parsed = parsePullRequestUrl(input);
+    number = parsed.number;
+    repository = {
+      host: parsed.host,
+      owner: parsed.owner,
+      repo: parsed.repo,
+    };
+    remote = await resolvePullRequestRemoteForUrl(runner, repo.currentWorktreePath, repository);
+  }
+
+  const viewed = await viewer(number, repository);
+  const fetchedCommit = await fetchPullRequestCommit(
+    runner,
+    repo.currentWorktreePath,
+    remote.name,
+    number,
+  );
+
+  return {
+    number,
+    repository,
+    remote: remote.name,
+    headBranch: viewed.headRefName,
+    headCommit: fetchedCommit,
+  };
 }

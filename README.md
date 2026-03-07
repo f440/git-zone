@@ -53,6 +53,8 @@ git-zone add 123
 git-zone add https://github.com/owner/repo/pull/123
 ```
 
+When the target is a pull request, `git-zone` creates a local branch using the pull request's head branch name by default.
+
 Show all worktrees for the current repository:
 
 ```bash
@@ -85,7 +87,8 @@ The target can be:
 - a GitHub pull request URL
 
 When the target is a local branch, the new worktree checks out that branch.
-When the target is a remote branch, tag, commit, pull request, or the current `HEAD`, the new worktree is created in detached HEAD state.
+When the target is a pull request, the new worktree creates and checks out a local branch with the pull request head branch name by default.
+When the target is a remote branch, tag, commit, or the current `HEAD`, the new worktree is created in detached HEAD state.
 
 Use `-c` or `--create-branch` to create a new local branch from the resolved target:
 
@@ -94,6 +97,8 @@ git-zone add main -c spike/new-idea
 git-zone add 123 -c fix/pr-123
 git-zone add -c spike/current-head
 ```
+
+Pull request resolution requires the GitHub CLI (`gh`).
 
 New worktrees are created under a `.zone` directory next to the main repository, grouped by repository name.
 

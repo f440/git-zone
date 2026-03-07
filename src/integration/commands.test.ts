@@ -188,6 +188,31 @@ describe("integration: add/list/remove", () => {
     ).toBe("spike/new-idea");
   });
 
+  test("creates a local branch by default for pull request targets", async () => {
+    const fixture = await setupRepositoryFixture();
+    const initial = await repoState(fixture.repoPath);
+    const commit = spawnGit(["rev-parse", "HEAD"], fixture.repoPath);
+
+    const result = await runAddCommand({
+      runner: git,
+      repo: initial.repo,
+      target: {
+        kind: "pr",
+        number: 123,
+        commit,
+        remote: "origin",
+        repository: { host: "github.com", owner: "f440", repo: "repo" },
+        headBranch: "feature/pr-default",
+      },
+      worktrees: initial.worktrees,
+    });
+
+    expect(result.lines[1]).toBe("checked out: feature/pr-default");
+    expect(
+      spawnGit(["rev-parse", "--abbrev-ref", "HEAD"], path.join(fixture.zoneRoot, "feature-pr-default")),
+    ).toBe("feature/pr-default");
+  });
+
   test("rejects zone path collisions and branches already checked out", async () => {
     const fixture = await setupRepositoryFixture();
     const firstState = await repoState(fixture.repoPath);

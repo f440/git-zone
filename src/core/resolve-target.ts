@@ -1,5 +1,5 @@
-import { AmbiguousTargetError, PullRequestResolutionError, TargetNotFoundError } from "./errors.js";
-import { parsePullRequestUrl, resolvePullRequestCommit } from "./github-pr.js";
+import { AmbiguousTargetError, TargetNotFoundError } from "./errors.js";
+import { resolvePullRequestMetadata } from "./github-pr.js";
 import type { GitRunner, RepoContext, ResolvedAddTarget } from "./types.js";
 
 async function refExists(
@@ -38,24 +38,26 @@ export async function resolveAddTarget(
   }
 
   if (target.startsWith("http://") || target.startsWith("https://")) {
-    const parsed = parsePullRequestUrl(target);
-    const resolved = await resolvePullRequestCommit(runner, repo, parsed.number, parsed);
+    const resolved = await resolvePullRequestMetadata(runner, repo, target);
     return {
       kind: "pr",
-      number: parsed.number,
-      commit: resolved.commit,
+      number: resolved.number,
+      commit: resolved.headCommit,
       remote: resolved.remote,
+      repository: resolved.repository,
+      headBranch: resolved.headBranch,
     };
   }
 
   if (/^\d+$/.test(target)) {
-    const number = Number.parseInt(target, 10);
-    const resolved = await resolvePullRequestCommit(runner, repo, number);
+    const resolved = await resolvePullRequestMetadata(runner, repo, target);
     return {
       kind: "pr",
-      number,
-      commit: resolved.commit,
+      number: resolved.number,
+      commit: resolved.headCommit,
       remote: resolved.remote,
+      repository: resolved.repository,
+      headBranch: resolved.headBranch,
     };
   }
 

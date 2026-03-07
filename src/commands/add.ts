@@ -19,7 +19,8 @@ export async function runAddCommand(options: {
   worktrees: WorktreeEntry[];
 }): Promise<AddCommandResult> {
   const { runner, repo, target, createBranch, worktrees } = options;
-  const { zoneName, zonePath } = await buildZonePath(repo, target, createBranch);
+  const effectiveCreateBranch = createBranch ?? (target.kind === "pr" ? target.headBranch : undefined);
+  const { zoneName, zonePath } = await buildZonePath(repo, target, effectiveCreateBranch);
 
   await fs.mkdir(path.dirname(zonePath), { recursive: true });
 
@@ -32,22 +33,27 @@ export async function runAddCommand(options: {
     }
   }
 
-  if (createBranch) {
-    const existingBranch = await runner(["show-ref", "--verify", "--quiet", `refs/heads/${createBranch}`], {
+  if (effectiveCreateBranch) {
+    const existingBranch = await runner(["show-ref", "--verify", "--quiet", `refs/heads/${effectiveCreateBranch}`], {
       cwd: repo.currentWorktreePath,
       allowFailure: true,
     });
     if (existingBranch.exitCode === 0) {
-      throw new UsageError(`branch already exists: ${createBranch}`);
+      if (target.kind === "pr" && !createBranch) {
+        throw new UsageError(`local branch already exists: ${effectiveCreateBranch}`, {
+          details: ["hint: specify -c <branch-name> explicitly"],
+        });
+      }
+      throw new UsageError(`branch already exists: ${effectiveCreateBranch}`);
     }
     await runner(
-      ["worktree", "add", "-b", createBranch, zonePath, target.commit],
+      ["worktree", "add", "-b", effectiveCreateBranch, zonePath, target.commit],
       { cwd: repo.currentWorktreePath },
     );
     return {
       lines: [
         `created worktree: ${zonePath}`,
-        `checked out: ${createBranch}`,
+        `checked out: ${effectiveCreateBranch}`,
       ],
       hookContext: {
         event: "post-add",
@@ -55,7 +61,7 @@ export async function runAddCommand(options: {
         mainWorktree: repo.mainWorktreePath,
         worktreePath: zonePath,
         zoneName,
-        branch: createBranch,
+        branch: effectiveCreateBranch,
       },
     };
   }
