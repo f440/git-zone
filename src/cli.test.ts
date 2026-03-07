@@ -18,6 +18,7 @@ describe("cli add parsing", () => {
       expect(stdout.join("")).toContain("git-zone add <target> -B <branch-name>");
       expect(stdout.join("")).toContain("git-zone add <target> --detach");
       expect(stdout.join("")).toContain("git-zone add <target> -d");
+      expect(stdout.join("")).toContain("git-zone add <target> -f");
     } finally {
       process.stdout.write = originalWrite;
     }
@@ -52,6 +53,23 @@ describe("cli add parsing", () => {
       const exitCode = await main(["add", "-d"]);
       expect(exitCode).toBe(1);
       expect(stderr.join("")).toContain("add requires a target; implicit HEAD is not supported");
+    } finally {
+      process.stderr.write = originalWrite;
+    }
+  });
+
+  test("accepts -f as an add flag without conflicting with remove", async () => {
+    const stderr: string[] = [];
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      const exitCode = await main(["add", "HEAD", "-f"]);
+      expect(exitCode).toBe(1);
+      expect(stderr.join("")).not.toContain("unknown option: -f");
     } finally {
       process.stderr.write = originalWrite;
     }

@@ -19,6 +19,7 @@ export async function runAddCommand(options: {
   branch?: string;
   branchMode?: AddBranchMode;
   detach?: boolean;
+  force?: boolean;
   worktrees: WorktreeEntry[];
 }): Promise<AddCommandResult> {
   const {
@@ -28,6 +29,7 @@ export async function runAddCommand(options: {
     branch,
     branchMode,
     detach = false,
+    force = false,
     worktrees,
   } = options;
 
@@ -41,7 +43,7 @@ export async function runAddCommand(options: {
 
   await fs.mkdir(path.dirname(zonePath), { recursive: true });
 
-  if (target.kind === "branch" && !branch && !detach) {
+  if (target.kind === "branch" && !branch && !detach && !force) {
     const inUse = worktrees.find((worktree) => worktree.branch === target.branch);
     if (inUse) {
       throw new UsageError(`branch '${target.branch}' is already checked out in another worktree`, {
@@ -66,6 +68,9 @@ export async function runAddCommand(options: {
     }
 
     const addArgs = ["worktree", "add"];
+    if (force) {
+      addArgs.push("-f");
+    }
     if (branchMode === "reset") {
       addArgs.push("-B", implicitBranch);
     } else {
@@ -96,7 +101,12 @@ export async function runAddCommand(options: {
   }
 
   if (target.kind === "branch") {
-    await runner(["worktree", "add", zonePath, target.branch], {
+    const addArgs = ["worktree", "add"];
+    if (force) {
+      addArgs.push("-f");
+    }
+    addArgs.push(zonePath, target.branch);
+    await runner(addArgs, {
       cwd: repo.currentWorktreePath,
     });
     return {
@@ -114,7 +124,12 @@ export async function runAddCommand(options: {
     };
   }
 
-  await runner(["worktree", "add", "--detach", zonePath, target.commit], {
+  const addArgs = ["worktree", "add"];
+  if (force) {
+    addArgs.push("-f");
+  }
+  addArgs.push("--detach", zonePath, target.commit);
+  await runner(addArgs, {
     cwd: repo.currentWorktreePath,
   });
 

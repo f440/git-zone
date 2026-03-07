@@ -157,4 +157,117 @@ describe("runAddCommand", () => {
     expect(result.lines[1]).toBe("checked out: detached at abc1234");
     expect(commands).toContain(`worktree add --detach ${path.join(repo.repoParent, ".zone", "repo", "commit-abc1234")} abc1234`);
   });
+
+  test("skips the branch-in-use precheck and passes -f for existing branch checkout", async () => {
+    const repo = await createRepoContext();
+    const commands: string[] = [];
+    const runner = createFakeRunner((args) => {
+      commands.push(args.join(" "));
+      if (args[0] === "worktree" && args[1] === "add") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    const result = await runAddCommand({
+      runner,
+      repo,
+      target: { kind: "branch", branch: "main", commit: "abc1234" },
+      worktrees: [
+        {
+          path: "/repo/elsewhere",
+          head: "abc1234",
+          branch: "main",
+          detached: false,
+          bare: false,
+          locked: false,
+          prunable: false,
+          isCurrent: false,
+        },
+      ],
+      force: true,
+    });
+
+    expect(result.lines[1]).toBe("checked out: main");
+    expect(commands).toContain(`worktree add -f ${path.join(repo.repoParent, ".zone", "repo", "main")} main`);
+  });
+
+  test("does not let force bypass existing -b branch collisions", async () => {
+    const repo = await createRepoContext();
+    const runner = createFakeRunner((args) => {
+      if (args.join(" ") === "show-ref --verify --quiet refs/heads/existing") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    await expect(
+      runAddCommand({
+        runner,
+        repo,
+        target: { kind: "branch", branch: "main", commit: "abc1234" },
+        branch: "existing",
+        branchMode: "create",
+        force: true,
+        worktrees: [],
+      }),
+    ).rejects.toThrow("branch already exists: existing");
+  });
+
+  test("does not let force bypass default PR branch collisions", async () => {
+    const repo = await createRepoContext();
+    const runner = createFakeRunner((args) => {
+      if (args.join(" ") === "show-ref --verify --quiet refs/heads/feature/login-fix") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    await expect(
+      runAddCommand({
+        runner,
+        repo,
+        target: {
+          kind: "pr",
+          number: 123,
+          commit: "abc123",
+          remote: "origin",
+          repository: { host: "github.com", owner: "f440", repo: "git-zone" },
+          headBranch: "feature/login-fix",
+        },
+        force: true,
+        worktrees: [],
+      }),
+    ).rejects.toThrow("local branch already exists: feature/login-fix");
+  });
+
+  test("passes -f together with -B when resetting a branch", async () => {
+    const repo = await createRepoContext();
+    const commands: string[] = [];
+    const runner = createFakeRunner((args) => {
+      commands.push(args.join(" "));
+      if (args.join(" ") === "show-ref --verify --quiet refs/heads/feature/reset-me") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      if (args[0] === "worktree" && args[1] === "add") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    const result = await runAddCommand({
+      runner,
+      repo,
+      target: { kind: "commit", rev: "HEAD", commit: "abc1234" },
+      branch: "feature/reset-me",
+      branchMode: "reset",
+      force: true,
+      worktrees: [],
+    });
+
+    expect(result.lines[1]).toBe("checked out: feature/reset-me");
+    expect(commands).toContain(
+      `worktree add -f -B feature/reset-me ${path.join(repo.repoParent, ".zone", "repo", "feature-reset-me")} abc1234`,
+    );
+  });
 });

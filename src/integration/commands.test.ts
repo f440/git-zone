@@ -238,14 +238,8 @@ describe("integration: add/list/remove", () => {
 
   test("rejects zone path collisions and branches already checked out", async () => {
     const fixture = await setupRepositoryFixture();
-    const firstState = await repoState(fixture.repoPath);
-    const firstTarget = await resolveAddTarget(git, firstState.repo, "feature/local");
-    await runAddCommand({
-      runner: git,
-      repo: firstState.repo,
-      target: firstTarget,
-      worktrees: firstState.worktrees,
-    });
+    const externalPath = path.join(fixture.root, "external-feature-local");
+    spawnGit(["worktree", "add", externalPath, "feature/local"], fixture.repoPath);
 
     const secondState = await repoState(fixture.repoPath);
     const secondTarget = await resolveAddTarget(git, secondState.repo, "feature/local");
@@ -258,6 +252,18 @@ describe("integration: add/list/remove", () => {
       }),
     ).rejects.toThrow();
 
+    const forcedResult = await runAddCommand({
+      runner: git,
+      repo: secondState.repo,
+      target: secondTarget,
+      worktrees: secondState.worktrees,
+      force: true,
+    });
+    expect(forcedResult.lines).toEqual([
+      `created worktree: ${path.join(fixture.zoneRoot, "feature-local")}`,
+      "checked out: feature/local",
+    ]);
+
     await fs.mkdir(path.join(fixture.zoneRoot, "main"), { recursive: true });
     const collisionState = await repoState(fixture.repoPath);
     const collisionTarget = await resolveAddTarget(git, collisionState.repo, "main");
@@ -269,6 +275,22 @@ describe("integration: add/list/remove", () => {
         worktrees: collisionState.worktrees,
       }),
     ).rejects.toThrow("zone path already exists");
+  });
+
+  test("allows reused branch checkout via CLI with -f", async () => {
+    const fixture = await setupRepositoryFixture();
+    const externalPath = path.join(fixture.root, "external-feature-local-cli");
+    spawnGit(["worktree", "add", externalPath, "feature/local"], fixture.repoPath);
+
+    const withoutForce = runCli(["add", "feature/local"], fixture.repoPath);
+    expect(withoutForce.exitCode).toBe(1);
+
+    const forcedAdd = runCli(["add", "feature/local", "-f"], fixture.repoPath);
+    expect(forcedAdd.exitCode).toBe(0);
+    expect(forcedAdd.stdout).toContain(`created worktree: ${path.join(fixture.zoneRoot, "feature-local")}`);
+    expect(
+      spawnGit(["rev-parse", "--abbrev-ref", "HEAD"], path.join(fixture.zoneRoot, "feature-local")),
+    ).toBe("feature/local");
   });
 
   test("lists worktrees with main first and dirty state", async () => {

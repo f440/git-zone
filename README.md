@@ -92,7 +92,7 @@ When the target is a pull request, the new worktree creates and checks out a loc
 When the target is a plain branch name and only a matching remote-tracking branch exists, `git-zone` creates a local tracking branch by default.
 When the target is an explicit remote branch, tag, commit, or `HEAD`, the new worktree is created in detached HEAD state unless you choose a branch explicitly.
 
-Use `-b` to create a new branch, `-B` to reset or reuse a branch name, and `--detach` or `-d` to force detached HEAD:
+Use `-b` to create a new branch, `-B` to reset or reuse a branch name, `--detach` or `-d` to force detached HEAD, and `-f` or `--force` to ask Git to allow a branch that is already checked out in another worktree:
 
 ```bash
 git-zone add main -b spike/new-idea
@@ -100,10 +100,13 @@ git-zone add 123 -b fix/pr-123
 git-zone add origin/main -B feature/from-remote
 git-zone add HEAD --detach
 git-zone add HEAD -d
+git-zone add main -f
 git-zone add 123 --detach
 ```
 
 Pull request resolution requires the GitHub CLI (`gh`).
+
+`-f` does not bypass existing local branch collisions for `-b`, default pull request branch names, or zone path collisions.
 
 New worktrees are created under a `.zone` directory next to the main repository, grouped by repository name.
 

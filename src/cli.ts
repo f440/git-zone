@@ -15,7 +15,7 @@ import type { AddBranchMode } from "./core/types.js";
 type ParsedArgs =
   | { kind: "global-help" }
   | { kind: "global-version" }
-  | { kind: "add"; target?: string; branch?: string; branchMode?: AddBranchMode; detach: boolean }
+  | { kind: "add"; target?: string; branch?: string; branchMode?: AddBranchMode; detach: boolean; force: boolean }
   | { kind: "list"; json: boolean }
   | { kind: "remove"; inputs: string[]; deleteBranch: boolean; force: boolean };
 
@@ -24,7 +24,7 @@ const GLOBAL_HELP = `git-zone
 Usage:
   git-zone --help
   git-zone --version
-  git-zone add <target> [-b <branch> | -B <branch>] [--detach | -d]
+  git-zone add <target> [-b <branch> | -B <branch>] [--detach | -d] [-f|--force]
   git-zone list
   git-zone remove <name-or-path>... [-b|--delete-branch] [-f|--force]
 `;
@@ -37,6 +37,7 @@ Usage:
   git-zone add <target> -B <branch-name>
   git-zone add <target> --detach
   git-zone add <target> -d
+  git-zone add <target> -f
 `;
 
 const LIST_HELP = `git-zone list
@@ -87,6 +88,7 @@ export async function main(argv: string[]): Promise<number> {
         branch: parsed.branch,
         branchMode: parsed.branchMode,
         detach: parsed.detach,
+        force: parsed.force,
         worktrees,
       });
       process.stdout.write(`${result.lines.join("\n")}\n`);
@@ -194,14 +196,19 @@ function parseAddArgs(args: string[]): ParsedArgs {
   let branch: string | undefined;
   let branchMode: AddBranchMode | undefined;
   let detach = false;
+  let force = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]!;
     if (arg === "-h" || arg === "--help") {
-      return { kind: "add", detach: false };
+      return { kind: "add", detach: false, force: false };
     }
     if (arg === "--detach" || arg === "-d") {
       detach = true;
+      continue;
+    }
+    if (arg === "--force" || arg === "-f") {
+      force = true;
       continue;
     }
     if (arg === "-b" || arg === "-B") {
@@ -236,7 +243,7 @@ function parseAddArgs(args: string[]): ParsedArgs {
     });
   }
 
-  return { kind: "add", target, branch, branchMode, detach };
+  return { kind: "add", target, branch, branchMode, detach, force };
 }
 
 function parseListArgs(args: string[]): ParsedArgs {
