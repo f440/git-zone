@@ -64,11 +64,6 @@ export async function collectWorktreeStatus(
   entry: WorktreeEntry,
   mainWorktreePath: string,
 ): Promise<WorktreeStatus> {
-  const headResult = await runner(["rev-parse", "HEAD"], {
-    cwd: entry.path,
-  });
-  const head = headResult.stdout.trim();
-
   let upstream: string | null = null;
   let ahead: number | null = null;
   let behind: number | null = null;
@@ -107,7 +102,7 @@ export async function collectWorktreeStatus(
     bare: entry.bare,
     locked: entry.locked,
     prunable: entry.prunable,
-    head,
+    head: entry.head,
     upstream,
     ahead,
     behind,

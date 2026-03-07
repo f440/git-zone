@@ -18,10 +18,10 @@ export async function runListCommand(options: {
     return left.path.localeCompare(right.path);
   });
 
-  const statuses = [];
-  for (const worktree of sorted) {
-    statuses.push(await collectWorktreeStatus(options.runner, worktree, options.repo.mainWorktreePath));
-  }
+  const statuses = await Promise.all(
+    sorted.map((worktree) =>
+      collectWorktreeStatus(options.runner, worktree, options.repo.mainWorktreePath)),
+  );
 
   if (options.format === "json") {
     return JSON.stringify(statuses, null, 2);
