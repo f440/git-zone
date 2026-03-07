@@ -40,11 +40,30 @@ export async function runRemoveCommand(options: {
       if (deleteBranch && removedWorktree.branch) {
         const stillUsed = remainingWorktrees.some((worktree) => worktree.branch === removedWorktree.branch);
         if (stillUsed) {
-          throw new UsageError(`branch is still in use: ${removedWorktree.branch}`);
+          throw new UsageError(`failed to delete branch after removing worktree: ${removedWorktree.branch}`, {
+            details: [
+              `worktree already removed: ${targetPath}`,
+              `branch remains: ${removedWorktree.branch}`,
+              `reason: branch is still in use`,
+            ],
+          });
         }
 
         const branchArgs = ["branch", force ? "-D" : "-d", removedWorktree.branch];
-        await runner(branchArgs, { cwd: repo.currentWorktreePath });
+        try {
+          await runner(branchArgs, { cwd: repo.currentWorktreePath });
+        } catch (error) {
+          if (error instanceof CliError) {
+            throw new UsageError(`failed to delete branch after removing worktree: ${removedWorktree.branch}`, {
+              details: [
+                `worktree already removed: ${targetPath}`,
+                `branch remains: ${removedWorktree.branch}`,
+              ],
+              gitResult: error.gitResult,
+            });
+          }
+          throw error;
+        }
         lines.push(`deleted branch: ${removedWorktree.branch}`);
       }
 

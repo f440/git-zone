@@ -85,6 +85,8 @@ The target can be:
 - a GitHub pull request number
 - a GitHub pull request URL
 
+Numeric targets are interpreted as pull request numbers before branch resolution. A branch name made only of digits will therefore be treated as a pull request target.
+
 When the target is a local branch, the new worktree checks out that branch.
 When the target is a pull request, the new worktree creates and checks out a local branch with the pull request head branch name by default.
 When the target is a plain branch name and only a matching remote-tracking branch exists, `git-zone` creates a local tracking branch by default.

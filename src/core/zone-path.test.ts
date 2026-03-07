@@ -57,8 +57,31 @@ describe("buildZonePath", () => {
     const existingPath = path.join(repoParent, ".zone", "repo", "main");
     await fs.mkdir(existingPath, { recursive: true });
 
-    await expect(buildZonePath(repo, { kind: "branch", branch: "main", commit: "abc1234" })).rejects.toThrow(
-      PathAlreadyExistsError,
-    );
+    await expect(buildZonePath(repo, { kind: "branch", branch: "main", commit: "abc1234" })).rejects.toMatchObject({
+      name: PathAlreadyExistsError.name,
+      message: `zone path already exists: ${existingPath}`,
+      details: [
+        "requested zone name: main",
+        "normalized zone name: main",
+      ],
+    });
+  });
+
+  test("explains zone name normalization on collision", async () => {
+    const repoParent = await fs.mkdtemp(path.join(os.tmpdir(), "git-zone-path-normalized-"));
+    const repo = createRepoContext(repoParent);
+    const existingPath = path.join(repoParent, ".zone", "repo", "feature-login");
+    await fs.mkdir(existingPath, { recursive: true });
+
+    await expect(
+      buildZonePath(repo, { kind: "branch", branch: "feature/login", commit: "abc1234" }),
+    ).rejects.toMatchObject({
+      name: PathAlreadyExistsError.name,
+      message: `zone path already exists: ${existingPath}`,
+      details: [
+        "requested zone name: feature/login",
+        "normalized zone name: feature-login",
+      ],
+    });
   });
 });

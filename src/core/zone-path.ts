@@ -31,16 +31,39 @@ export async function ensureZonePathDoesNotExist(zonePath: string): Promise<void
   throw new PathAlreadyExistsError(`zone path already exists: ${zonePath}`);
 }
 
+export async function ensureZonePathDoesNotExistWithContext(
+  zonePath: string,
+  options: {
+    requestedName: string;
+    normalizedName: string;
+  },
+): Promise<void> {
+  try {
+    await fs.access(zonePath);
+  } catch {
+    return;
+  }
+
+  throw new PathAlreadyExistsError(`zone path already exists: ${zonePath}`, {
+    details: [
+      `requested zone name: ${options.requestedName}`,
+      `normalized zone name: ${options.normalizedName}`,
+    ],
+  });
+}
+
 export async function buildZonePath(
   repo: RepoContext,
   target: ResolvedAddTarget,
   createBranch?: string,
 ): Promise<{ zoneName: string; zonePath: string }> {
-  const zoneName = createBranch
-    ? normalizeZoneName(createBranch)
-    : normalizeZoneName(zoneNameFromTarget(target));
+  const requestedName = createBranch ?? zoneNameFromTarget(target);
+  const zoneName = normalizeZoneName(requestedName);
   const zonePath = path.join(repo.repoParent, ".zone", repo.repoName, zoneName);
-  await ensureZonePathDoesNotExist(zonePath);
+  await ensureZonePathDoesNotExistWithContext(zonePath, {
+    requestedName,
+    normalizedName: zoneName,
+  });
   return { zoneName, zonePath };
 }
 
