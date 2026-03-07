@@ -65,3 +65,37 @@ export type ParsedGitHubRepo = {
 export type ParsedPullRequestUrl = ParsedGitHubRepo & {
   number: number;
 };
+
+export type HookEvent = "post-add" | "post-remove";
+
+export type HookContext = {
+  event: HookEvent;
+  repoRoot: string;
+  mainWorktree: string;
+  worktreePath: string;
+  zoneName: string;
+  branch: string;
+};
+
+export type AddCommandResult = {
+  lines: string[];
+  hookContext: HookContext;
+};
+
+export type RemoveCommandSuccess = {
+  ok: true;
+  lines: string[];
+  hookContext: HookContext;
+};
+
+export type RemoveCommandFailure = {
+  ok: false;
+  lines: string[];
+};
+
+export type RemoveCommandItemResult = RemoveCommandSuccess | RemoveCommandFailure;
+
+export type RemoveCommandResult = {
+  results: RemoveCommandItemResult[];
+  failures: number;
+};

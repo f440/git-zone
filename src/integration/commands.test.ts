@@ -12,6 +12,7 @@ import { resolveAddTarget } from "../core/resolve-target.js";
 import { getWorktreeEntries } from "../core/worktree.js";
 
 const textDecoder = new TextDecoder();
+const cliPath = new URL("../cli.ts", import.meta.url).pathname;
 
 function spawnGit(args: string[], cwd: string, env: Record<string, string> = {}): string {
   const result = Bun.spawnSync({
@@ -32,6 +33,29 @@ function spawnGit(args: string[], cwd: string, env: Record<string, string> = {})
   }
 
   return textDecoder.decode(result.stdout).trim();
+}
+
+function runCli(
+  args: string[],
+  cwd: string,
+  env: Record<string, string> = {},
+): { exitCode: number; stdout: string; stderr: string } {
+  const result = Bun.spawnSync({
+    cmd: ["bun", "run", cliPath, ...args],
+    cwd,
+    env: {
+      ...process.env,
+      ...env,
+    },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  return {
+    exitCode: result.exitCode,
+    stdout: textDecoder.decode(result.stdout),
+    stderr: textDecoder.decode(result.stderr),
+  };
 }
 
 async function writeFile(filePath: string, contents: string): Promise<void> {
@@ -103,13 +127,14 @@ describe("integration: add/list/remove", () => {
     const initial = await repoState(fixture.repoPath);
 
     const localTarget = await resolveAddTarget(git, initial.repo, "feature/local");
-    const localLines = await runAddCommand({
+    const localResult = await runAddCommand({
       runner: git,
       repo: initial.repo,
       target: localTarget,
       worktrees: initial.worktrees,
     });
-    expect(localLines[0]).toBe(`created worktree: ${path.join(fixture.zoneRoot, "feature-local")}`);
+    expect(localResult.lines[0]).toBe(`created worktree: ${path.join(fixture.zoneRoot, "feature-local")}`);
+    expect(localResult.hookContext.branch).toBe("feature/local");
     expect(spawnGit(["rev-parse", "--abbrev-ref", "HEAD"], path.join(fixture.zoneRoot, "feature-local"))).toBe(
       "feature/local",
     );
@@ -246,8 +271,13 @@ describe("integration: add/list/remove", () => {
       force: false,
     });
     expect(removeResult.failures).toBe(0);
-    expect(removeResult.lines).toContain(`removed: ${path.join(fixture.zoneRoot, "spike-remove-me")}`);
-    expect(removeResult.lines).toContain("deleted branch: spike/remove-me");
+    const firstResult = removeResult.results[0];
+    expect(firstResult?.ok).toBe(true);
+    if (firstResult?.ok) {
+      expect(firstResult.lines).toContain(`removed: ${path.join(fixture.zoneRoot, "spike-remove-me")}`);
+      expect(firstResult.lines).toContain("deleted branch: spike/remove-me");
+      expect(firstResult.hookContext.branch).toBe("spike/remove-me");
+    }
 
     const branchLookup = Bun.spawnSync({
       cmd: ["git", "show-ref", "--verify", "--quiet", "refs/heads/spike/remove-me"],
@@ -267,7 +297,115 @@ describe("integration: add/list/remove", () => {
       force: false,
     });
     expect(mixedResult.failures).toBe(2);
-    expect(mixedResult.lines.join("\n")).toContain("main worktree cannot be removed");
-    expect(mixedResult.lines.join("\n")).toContain("could not resolve remove target 'missing-target'");
+    expect(mixedResult.results.flatMap((item) => item.lines).join("\n")).toContain("main worktree cannot be removed");
+    expect(mixedResult.results.flatMap((item) => item.lines).join("\n")).toContain("could not resolve remove target 'missing-target'");
+  });
+
+  test("runs postAdd hooks from the main worktree and passes hook env", async () => {
+    const fixture = await setupRepositoryFixture();
+    const outputPath = path.join(fixture.root, "hook-post-add.txt");
+
+    await fs.mkdir(path.join(fixture.repoPath, "scripts"), { recursive: true });
+    await writeFile(
+      path.join(fixture.repoPath, "scripts", "zone-post-add"),
+      `#!/bin/sh
+set -eu
+printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$ZONE_MAIN_WORKTREE" "$ZONE_WORKTREE_PATH" "$ZONE_ZONE_NAME" "$ZONE_BRANCH" > "${outputPath}"
+`,
+    );
+    spawnGit(["config", "zone.hooks.postAdd", "./scripts/zone-post-add"], fixture.repoPath);
+    await fs.chmod(path.join(fixture.repoPath, "scripts", "zone-post-add"), 0o755);
+
+    const result = runCli(["add", "main", "-c", "feature/hooked"], fixture.repoPath);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("created worktree:");
+    const hookOutput = (await fs.readFile(outputPath, "utf8")).trim().split("\n");
+    expect(hookOutput[0]).toBe(fixture.repoPath);
+    expect(hookOutput[1]).toBe("post-add");
+    expect(hookOutput[2]).toBe(fixture.repoPath);
+    expect(hookOutput[3]).toBe(fixture.repoPath);
+    expect(hookOutput[4]).toBe(path.join(fixture.zoneRoot, "feature-hooked"));
+    expect(hookOutput[5]).toBe("feature-hooked");
+    expect(hookOutput[6]).toBe("feature/hooked");
+  });
+
+  test("fails add when postAdd hook fails but leaves the worktree in place", async () => {
+    const fixture = await setupRepositoryFixture();
+    await fs.mkdir(path.join(fixture.repoPath, "scripts"), { recursive: true });
+    await writeFile(
+      path.join(fixture.repoPath, "scripts", "zone-post-add"),
+      "#!/bin/sh\nexit 7\n",
+    );
+    spawnGit(["config", "zone.hooks.postAdd", "./scripts/zone-post-add"], fixture.repoPath);
+    await fs.chmod(path.join(fixture.repoPath, "scripts", "zone-post-add"), 0o755);
+
+    const result = runCli(["add", "main", "-c", "feature/failing-hook"], fixture.repoPath);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("created worktree:");
+    expect(result.stderr).toContain("post-add hook failed with exit code 7");
+    expect(
+      spawnGit(["rev-parse", "--abbrev-ref", "HEAD"], path.join(fixture.zoneRoot, "feature-failing-hook")),
+    ).toBe("feature/failing-hook");
+  });
+
+  test("runs postRemove hooks after removal and passes original branch info", async () => {
+    const fixture = await setupRepositoryFixture();
+    const addResult = runCli(["add", "main", "-c", "feature/remove-hook"], fixture.repoPath);
+    expect(addResult.exitCode).toBe(0);
+
+    const outputPath = path.join(fixture.root, "hook-post-remove.txt");
+    await fs.mkdir(path.join(fixture.repoPath, "scripts"), { recursive: true });
+    await writeFile(
+      path.join(fixture.repoPath, "scripts", "zone-post-remove"),
+      `#!/bin/sh
+set -eu
+printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$ZONE_MAIN_WORKTREE" "$ZONE_WORKTREE_PATH" "$ZONE_ZONE_NAME" "$ZONE_BRANCH" > "${outputPath}"
+`,
+    );
+    spawnGit(["config", "zone.hooks.postRemove", "./scripts/zone-post-remove"], fixture.repoPath);
+    await fs.chmod(path.join(fixture.repoPath, "scripts", "zone-post-remove"), 0o755);
+
+    const removeResult = runCli(["remove", "feature/remove-hook", "-b"], fixture.repoPath);
+
+    expect(removeResult.exitCode).toBe(0);
+    expect(removeResult.stdout).toContain("removed:");
+    const hookOutput = (await fs.readFile(outputPath, "utf8")).trim().split("\n");
+    expect(hookOutput[0]).toBe(fixture.repoPath);
+    expect(hookOutput[1]).toBe("post-remove");
+    expect(hookOutput[4]).toBe(path.join(fixture.zoneRoot, "feature-remove-hook"));
+    expect(hookOutput[5]).toBe("feature-remove-hook");
+    expect(hookOutput[6]).toBe("feature/remove-hook");
+    await expect(fs.access(path.join(fixture.zoneRoot, "feature-remove-hook"))).rejects.toThrow();
+  });
+
+  test("continues remove when postRemove hook fails and returns non-zero overall", async () => {
+    const fixture = await setupRepositoryFixture();
+    expect(runCli(["add", "main", "-c", "feature/hook-one"], fixture.repoPath).exitCode).toBe(0);
+    expect(runCli(["add", "main", "-c", "feature/hook-two"], fixture.repoPath).exitCode).toBe(0);
+
+    await fs.mkdir(path.join(fixture.repoPath, "scripts"), { recursive: true });
+    await writeFile(
+      path.join(fixture.repoPath, "scripts", "zone-post-remove"),
+      `#!/bin/sh
+set -eu
+if [ "$ZONE_ZONE_NAME" = "feature-hook-one" ]; then
+  exit 9
+fi
+exit 0
+`,
+    );
+    spawnGit(["config", "zone.hooks.postRemove", "./scripts/zone-post-remove"], fixture.repoPath);
+    await fs.chmod(path.join(fixture.repoPath, "scripts", "zone-post-remove"), 0o755);
+
+    const result = runCli(["remove", "feature/hook-one", "feature/hook-two", "-b"], fixture.repoPath);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain(`removed: ${path.join(fixture.zoneRoot, "feature-hook-one")}`);
+    expect(result.stdout).toContain(`removed: ${path.join(fixture.zoneRoot, "feature-hook-two")}`);
+    expect(result.stderr).toContain("post-remove hook failed with exit code 9");
+    await expect(fs.access(path.join(fixture.zoneRoot, "feature-hook-one"))).rejects.toThrow();
+    await expect(fs.access(path.join(fixture.zoneRoot, "feature-hook-two"))).rejects.toThrow();
   });
 });

@@ -4,8 +4,9 @@ import pkg from "../package.json" with { type: "json" };
 import { runAddCommand } from "./commands/add.js";
 import { runListCommand } from "./commands/list.js";
 import { runRemoveCommand } from "./commands/remove.js";
-import { CliError, UsageError } from "./core/errors.js";
+import { CliError, HookExecutionError, UsageError } from "./core/errors.js";
 import { git } from "./core/git.js";
+import { runHook } from "./core/hooks.js";
 import { resolveRepoContext } from "./core/repo.js";
 import { resolveAddTarget } from "./core/resolve-target.js";
 import { getWorktreeEntries } from "./core/worktree.js";
@@ -76,14 +77,23 @@ export async function main(argv: string[]): Promise<number> {
 
     if (parsed.kind === "add") {
       const target = await resolveAddTarget(git, repo, parsed.target);
-      const lines = await runAddCommand({
+      const result = await runAddCommand({
         runner: git,
         repo,
         target,
         createBranch: parsed.createBranch,
         worktrees,
       });
-      process.stdout.write(`${lines.join("\n")}\n`);
+      process.stdout.write(`${result.lines.join("\n")}\n`);
+      try {
+        await runHook(git, result.hookContext);
+      } catch (error) {
+        if (error instanceof HookExecutionError) {
+          process.stderr.write(`${error.message}\n`);
+          return 1;
+        }
+        throw error;
+      }
       return 0;
     }
 
@@ -105,9 +115,36 @@ export async function main(argv: string[]): Promise<number> {
       deleteBranch: parsed.deleteBranch,
       force: parsed.force,
     });
-    const stream = result.failures === 0 ? process.stdout : process.stderr;
-    stream.write(`${result.lines.join("\n")}\n`);
-    return result.failures === 0 ? 0 : 1;
+    const stdoutLines: string[] = [];
+    const stderrLines: string[] = [];
+    let failures = result.failures;
+
+    for (const item of result.results) {
+      if (!item.ok) {
+        stderrLines.push(...item.lines);
+        continue;
+      }
+
+      stdoutLines.push(...item.lines);
+      try {
+        await runHook(git, item.hookContext);
+      } catch (error) {
+        if (error instanceof HookExecutionError) {
+          failures += 1;
+          stderrLines.push(error.message);
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    if (stdoutLines.length > 0) {
+      process.stdout.write(`${stdoutLines.join("\n")}\n`);
+    }
+    if (stderrLines.length > 0) {
+      process.stderr.write(`${stderrLines.join("\n")}\n`);
+    }
+    return failures === 0 ? 0 : 1;
   } catch (error) {
     if (error instanceof CliError) {
       process.stderr.write(`${error.format()}\n`);

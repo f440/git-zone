@@ -124,6 +124,49 @@ Each target can be resolved by:
 Use `-b` or `--delete-branch` to delete the corresponding local branch after removing the worktree.
 Use `-f` or `--force` to force removal when Git would normally refuse it.
 
+## Hooks
+
+`git-zone` can run user-defined commands after a worktree is added or removed.
+
+Configure hooks with Git config:
+
+```bash
+git config zone.hooks.postAdd './scripts/zone-post-add'
+git config zone.hooks.postRemove './scripts/zone-post-remove'
+```
+
+Hook commands are executed by `/bin/sh -c` from the main worktree directory.
+
+`postAdd` runs after a worktree has been created successfully.
+`postRemove` runs after a worktree has been removed successfully.
+
+Hooks receive the following environment variables:
+
+- `ZONE_EVENT`
+- `ZONE_REPO_ROOT`
+- `ZONE_MAIN_WORKTREE`
+- `ZONE_WORKTREE_PATH`
+- `ZONE_ZONE_NAME`
+- `ZONE_BRANCH`
+
+Example `postAdd` hook:
+
+```bash
+#!/bin/sh
+set -eu
+
+ln -sf "$ZONE_MAIN_WORKTREE/.env.local" "$ZONE_WORKTREE_PATH/.env.local"
+```
+
+Example `postRemove` hook:
+
+```bash
+#!/bin/sh
+set -eu
+
+tmux kill-session -t "zone-$ZONE_ZONE_NAME" || true
+```
+
 ## Examples
 
 Create worktrees from different targets:

@@ -1,4 +1,4 @@
-import type { GitResult } from "./types.js";
+import type { GitResult, HookEvent } from "./types.js";
 
 type ErrorOptions = {
   exitCode?: number;
@@ -45,3 +45,15 @@ export class AmbiguousTargetError extends CliError {}
 export class PathAlreadyExistsError extends CliError {}
 export class GitCommandError extends CliError {}
 export class PullRequestResolutionError extends CliError {}
+export class HookExecutionError extends CliError {
+  readonly event: HookEvent;
+  readonly hookExitCode: number;
+  readonly hookCommand: string;
+
+  constructor(event: HookEvent, hookExitCode: number, hookCommand: string) {
+    super(`${event} hook failed with exit code ${hookExitCode}`);
+    this.event = event;
+    this.hookExitCode = hookExitCode;
+    this.hookCommand = hookCommand;
+  }
+}

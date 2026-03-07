@@ -1,6 +1,8 @@
+import path from "node:path";
+
 import { CliError, UsageError } from "../core/errors.js";
 import { resolveRemoveTarget } from "../core/resolve-remove-target.js";
-import type { GitRunner, RepoContext, WorktreeEntry } from "../core/types.js";
+import type { GitRunner, RemoveCommandResult, RepoContext, WorktreeEntry } from "../core/types.js";
 
 export async function runRemoveCommand(options: {
   runner: GitRunner;
@@ -9,9 +11,9 @@ export async function runRemoveCommand(options: {
   inputs: string[];
   deleteBranch: boolean;
   force: boolean;
-}): Promise<{ lines: string[]; failures: number }> {
+}): Promise<RemoveCommandResult> {
   const { runner, repo, worktrees, inputs, deleteBranch, force } = options;
-  const lines: string[] = [];
+  const results: RemoveCommandResult["results"] = [];
   let failures = 0;
   const remainingWorktrees = [...worktrees];
 
@@ -30,7 +32,7 @@ export async function runRemoveCommand(options: {
       }
       removeArgs.push(targetPath);
       await runner(removeArgs, { cwd: repo.currentWorktreePath });
-      lines.push(`removed: ${targetPath}`);
+      const lines = [`removed: ${targetPath}`];
 
       const index = remainingWorktrees.findIndex((worktree) => worktree.path === targetPath);
       const removedWorktree = index >= 0 ? remainingWorktrees.splice(index, 1)[0]! : resolution.worktree;
@@ -45,17 +47,30 @@ export async function runRemoveCommand(options: {
         await runner(branchArgs, { cwd: repo.currentWorktreePath });
         lines.push(`deleted branch: ${removedWorktree.branch}`);
       }
+
+      results.push({
+        ok: true,
+        lines,
+        hookContext: {
+          event: "post-remove",
+          repoRoot: repo.mainWorktreePath,
+          mainWorktree: repo.mainWorktreePath,
+          worktreePath: targetPath,
+          zoneName: resolution.kind === "zone" ? resolution.zoneName : path.basename(targetPath),
+          branch: removedWorktree.branch ?? "",
+        },
+      });
     } catch (error) {
       failures += 1;
       if (error instanceof CliError) {
-        lines.push(error.format());
+        results.push({ ok: false, lines: [error.format()] });
       } else if (error instanceof Error) {
-        lines.push(`error: ${error.message}`);
+        results.push({ ok: false, lines: [`error: ${error.message}`] });
       } else {
-        lines.push("error: remove failed");
+        results.push({ ok: false, lines: ["error: remove failed"] });
       }
     }
   }
 
-  return { lines, failures };
+  return { results, failures };
 }
