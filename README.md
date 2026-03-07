@@ -43,7 +43,7 @@ git-zone add feature/login-fix
 Create a new branch from `main` in a new worktree:
 
 ```bash
-git-zone add main -c spike/new-idea
+git-zone add main -b spike/new-idea
 ```
 
 Open a pull request in its own worktree:
@@ -88,14 +88,16 @@ The target can be:
 
 When the target is a local branch, the new worktree checks out that branch.
 When the target is a pull request, the new worktree creates and checks out a local branch with the pull request head branch name by default.
-When the target is a remote branch, tag, commit, or the current `HEAD`, the new worktree is created in detached HEAD state.
+When the target is a plain branch name and only a matching remote-tracking branch exists, `git-zone` creates a local tracking branch by default.
+When the target is an explicit remote branch, tag, commit, or the current `HEAD`, the new worktree is created in detached HEAD state unless you choose a branch explicitly.
 
-Use `-c` or `--create-branch` to create a new local branch from the resolved target:
+Use `-b` to create a new branch, `-B` to reset or reuse a branch name, and `--detach` to force detached HEAD:
 
 ```bash
-git-zone add main -c spike/new-idea
-git-zone add 123 -c fix/pr-123
-git-zone add -c spike/current-head
+git-zone add main -b spike/new-idea
+git-zone add 123 -b fix/pr-123
+git-zone add origin/main -B feature/from-remote
+git-zone add 123 --detach
 ```
 
 Pull request resolution requires the GitHub CLI (`gh`).
@@ -187,7 +189,7 @@ git-zone add 123
 Create a branch directly into a new worktree:
 
 ```bash
-git-zone add origin/main -c feature/from-remote
+git-zone add origin/main -b feature/from-remote
 ```
 
 Remove by branch name or directory name:

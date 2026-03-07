@@ -122,7 +122,7 @@ async function repoState(repoPath: string) {
 }
 
 describe("integration: add/list/remove", () => {
-  test("adds worktrees for local branch, remote branch, tag, commit, and create-branch", async () => {
+  test("adds worktrees for local branch, remote branch, tag, commit, and -b branch creation", async () => {
     const fixture = await setupRepositoryFixture();
     const initial = await repoState(fixture.repoPath);
 
@@ -145,6 +145,7 @@ describe("integration: add/list/remove", () => {
       runner: git,
       repo: afterLocal.repo,
       target: remoteTarget,
+      detach: true,
       worktrees: afterLocal.worktrees,
     });
     expect(spawnGit(["rev-parse", "--abbrev-ref", "HEAD"], path.join(fixture.zoneRoot, "origin-feature-remote"))).toBe(
@@ -175,12 +176,13 @@ describe("integration: add/list/remove", () => {
     );
 
     const afterCommit = await repoState(fixture.repoPath);
-    const createBranchTarget = await resolveAddTarget(git, afterCommit.repo, "main");
+    const branchTarget = await resolveAddTarget(git, afterCommit.repo, "main");
     await runAddCommand({
       runner: git,
       repo: afterCommit.repo,
-      target: createBranchTarget,
-      createBranch: "spike/new-idea",
+      target: branchTarget,
+      branch: "spike/new-idea",
+      branchMode: "create",
       worktrees: afterCommit.worktrees,
     });
     expect(
@@ -211,6 +213,27 @@ describe("integration: add/list/remove", () => {
     expect(
       spawnGit(["rev-parse", "--abbrev-ref", "HEAD"], path.join(fixture.zoneRoot, "feature-pr-default")),
     ).toBe("feature/pr-default");
+  });
+
+  test("creates a tracking branch from a unique remote branch name", async () => {
+    const fixture = await setupRepositoryFixture();
+    const initial = await repoState(fixture.repoPath);
+
+    const target = await resolveAddTarget(git, initial.repo, "feature/remote");
+    const result = await runAddCommand({
+      runner: git,
+      repo: initial.repo,
+      target,
+      worktrees: initial.worktrees,
+    });
+
+    expect(result.lines[1]).toBe("checked out: feature/remote");
+    expect(
+      spawnGit(["rev-parse", "--abbrev-ref", "HEAD"], path.join(fixture.zoneRoot, "feature-remote")),
+    ).toBe("feature/remote");
+    expect(
+      spawnGit(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], path.join(fixture.zoneRoot, "feature-remote")),
+    ).toBe("origin/feature/remote");
   });
 
   test("rejects zone path collisions and branches already checked out", async () => {
@@ -277,12 +300,13 @@ describe("integration: add/list/remove", () => {
   test("removes worktrees, deletes branches, rejects main removal, and continues on mixed outcomes", async () => {
     const fixture = await setupRepositoryFixture();
     const initial = await repoState(fixture.repoPath);
-    const createBranchTarget = await resolveAddTarget(git, initial.repo, "main");
+    const branchTarget = await resolveAddTarget(git, initial.repo, "main");
     await runAddCommand({
       runner: git,
       repo: initial.repo,
-      target: createBranchTarget,
-      createBranch: "spike/remove-me",
+      target: branchTarget,
+      branch: "spike/remove-me",
+      branchMode: "create",
       worktrees: initial.worktrees,
     });
 
@@ -341,7 +365,7 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$Z
     spawnGit(["config", "zone.hooks.postAdd", "./scripts/zone-post-add"], fixture.repoPath);
     await fs.chmod(path.join(fixture.repoPath, "scripts", "zone-post-add"), 0o755);
 
-    const result = runCli(["add", "main", "-c", "feature/hooked"], fixture.repoPath);
+    const result = runCli(["add", "main", "-b", "feature/hooked"], fixture.repoPath);
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("created worktree:");
@@ -365,7 +389,7 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$Z
     spawnGit(["config", "zone.hooks.postAdd", "./scripts/zone-post-add"], fixture.repoPath);
     await fs.chmod(path.join(fixture.repoPath, "scripts", "zone-post-add"), 0o755);
 
-    const result = runCli(["add", "main", "-c", "feature/failing-hook"], fixture.repoPath);
+    const result = runCli(["add", "main", "-b", "feature/failing-hook"], fixture.repoPath);
 
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toContain("created worktree:");
@@ -377,7 +401,7 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$Z
 
   test("runs postRemove hooks after removal and passes original branch info", async () => {
     const fixture = await setupRepositoryFixture();
-    const addResult = runCli(["add", "main", "-c", "feature/remove-hook"], fixture.repoPath);
+    const addResult = runCli(["add", "main", "-b", "feature/remove-hook"], fixture.repoPath);
     expect(addResult.exitCode).toBe(0);
 
     const outputPath = path.join(fixture.root, "hook-post-remove.txt");
@@ -407,8 +431,8 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_REPO_ROOT" "$Z
 
   test("continues remove when postRemove hook fails and returns non-zero overall", async () => {
     const fixture = await setupRepositoryFixture();
-    expect(runCli(["add", "main", "-c", "feature/hook-one"], fixture.repoPath).exitCode).toBe(0);
-    expect(runCli(["add", "main", "-c", "feature/hook-two"], fixture.repoPath).exitCode).toBe(0);
+    expect(runCli(["add", "main", "-b", "feature/hook-one"], fixture.repoPath).exitCode).toBe(0);
+    expect(runCli(["add", "main", "-b", "feature/hook-two"], fixture.repoPath).exitCode).toBe(0);
 
     await fs.mkdir(path.join(fixture.repoPath, "scripts"), { recursive: true });
     await writeFile(

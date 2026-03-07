@@ -25,6 +25,37 @@ async function resolveCommitFromRef(
   return result.stdout.trim();
 }
 
+async function getDefaultRemote(runner: GitRunner, cwd: string): Promise<string | null> {
+  const result = await runner(["config", "--get", "checkout.defaultRemote"], {
+    cwd,
+    allowFailure: true,
+  });
+
+  if (result.exitCode !== 0) {
+    return null;
+  }
+
+  const value = result.stdout.trim();
+  return value === "" ? null : value;
+}
+
+async function listMatchingRemoteBranches(
+  runner: GitRunner,
+  cwd: string,
+  branch: string,
+): Promise<string[]> {
+  const result = await runner(["for-each-ref", "--format=%(refname:short)", `refs/remotes/*/${branch}`], {
+    cwd,
+    allowFailure: true,
+  });
+
+  if (result.exitCode !== 0 || result.stdout.trim() === "") {
+    return [];
+  }
+
+  return result.stdout.trim().split("\n").filter((line) => line !== "");
+}
+
 export async function resolveAddTarget(
   runner: GitRunner,
   repo: RepoContext,
@@ -98,6 +129,29 @@ export async function resolveAddTarget(
       kind: "tag",
       tag: target,
       commit: await resolveCommitFromRef(runner, repo.currentWorktreePath, `refs/tags/${target}`),
+    };
+  }
+
+  const remoteCandidates = await listMatchingRemoteBranches(runner, repo.currentWorktreePath, target);
+  if (remoteCandidates.length > 0) {
+    const defaultRemote = await getDefaultRemote(runner, repo.currentWorktreePath);
+    const preferredCandidates = defaultRemote
+      ? remoteCandidates.filter((candidate) => candidate.startsWith(`${defaultRemote}/`))
+      : remoteCandidates;
+    const selectedCandidates = preferredCandidates.length > 0 ? preferredCandidates : remoteCandidates;
+
+    if (selectedCandidates.length > 1) {
+      throw new AmbiguousTargetError(`ambiguous add target '${target}'`, {
+        details: selectedCandidates.map((candidate) => `matched remote-tracking branch: ${candidate}`),
+      });
+    }
+
+    const remoteBranch = selectedCandidates[0]!;
+    return {
+      kind: "remote",
+      remoteBranch,
+      guessedLocalBranch: target,
+      commit: await resolveCommitFromRef(runner, repo.currentWorktreePath, `refs/remotes/${remoteBranch}`),
     };
   }
 

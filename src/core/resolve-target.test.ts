@@ -77,6 +77,9 @@ describe("resolveAddTarget", () => {
       ) {
         return { stdout: "", stderr: "", exitCode: 1, command: ["git", ...args] };
       }
+      if (command === "for-each-ref --format=%(refname:short) refs/remotes/*/abc1234") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
       if (command === "rev-parse --verify abc1234^{commit}") {
         return { stdout: "abc1234deadbeef\n", stderr: "", exitCode: 0, command: ["git", ...args] };
       }
@@ -87,6 +90,36 @@ describe("resolveAddTarget", () => {
       kind: "commit",
       rev: "abc1234",
       commit: "abc1234deadbeef",
+    });
+  });
+
+  test("guesses a unique remote-tracking branch when local branch is missing", async () => {
+    const runner = createFakeRunner((args) => {
+      const command = args.join(" ");
+      if (
+        command === "show-ref --verify --quiet refs/heads/topic"
+        || command === "show-ref --verify --quiet refs/remotes/topic"
+        || command === "show-ref --verify --quiet refs/tags/topic"
+      ) {
+        return { stdout: "", stderr: "", exitCode: 1, command: ["git", ...args] };
+      }
+      if (command === "for-each-ref --format=%(refname:short) refs/remotes/*/topic") {
+        return { stdout: "origin/topic\n", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      if (command === "config --get checkout.defaultRemote") {
+        return { stdout: "", stderr: "", exitCode: 1, command: ["git", ...args] };
+      }
+      if (command === "rev-parse refs/remotes/origin/topic^{commit}") {
+        return { stdout: "feedface\n", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${command}`);
+    });
+
+    await expect(resolveAddTarget(runner, repo, "topic")).resolves.toEqual({
+      kind: "remote",
+      remoteBranch: "origin/topic",
+      guessedLocalBranch: "topic",
+      commit: "feedface",
     });
   });
 });

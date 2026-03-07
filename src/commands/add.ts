@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { UsageError } from "../core/errors.js";
 import type {
+  AddBranchMode,
   AddCommandResult,
   GitRunner,
   RepoContext,
@@ -15,16 +16,32 @@ export async function runAddCommand(options: {
   runner: GitRunner;
   repo: RepoContext;
   target: ResolvedAddTarget;
-  createBranch?: string;
+  branch?: string;
+  branchMode?: AddBranchMode;
+  detach?: boolean;
   worktrees: WorktreeEntry[];
 }): Promise<AddCommandResult> {
-  const { runner, repo, target, createBranch, worktrees } = options;
-  const effectiveCreateBranch = createBranch ?? (target.kind === "pr" ? target.headBranch : undefined);
-  const { zoneName, zonePath } = await buildZonePath(repo, target, effectiveCreateBranch);
+  const {
+    runner,
+    repo,
+    target,
+    branch,
+    branchMode,
+    detach = false,
+    worktrees,
+  } = options;
+
+  const implicitBranch =
+    !detach
+      ? branch
+        ?? (target.kind === "pr" ? target.headBranch : undefined)
+        ?? (target.kind === "remote" ? target.guessedLocalBranch : undefined)
+      : undefined;
+  const { zoneName, zonePath } = await buildZonePath(repo, target, implicitBranch);
 
   await fs.mkdir(path.dirname(zonePath), { recursive: true });
 
-  if (target.kind === "branch" && !createBranch) {
+  if (target.kind === "branch" && !branch && !detach) {
     const inUse = worktrees.find((worktree) => worktree.branch === target.branch);
     if (inUse) {
       throw new UsageError(`branch '${target.branch}' is already checked out in another worktree`, {
@@ -33,27 +50,40 @@ export async function runAddCommand(options: {
     }
   }
 
-  if (effectiveCreateBranch) {
-    const existingBranch = await runner(["show-ref", "--verify", "--quiet", `refs/heads/${effectiveCreateBranch}`], {
+  if (implicitBranch) {
+    const existingBranch = await runner(["show-ref", "--verify", "--quiet", `refs/heads/${implicitBranch}`], {
       cwd: repo.currentWorktreePath,
       allowFailure: true,
     });
-    if (existingBranch.exitCode === 0) {
-      if (target.kind === "pr" && !createBranch) {
-        throw new UsageError(`local branch already exists: ${effectiveCreateBranch}`, {
-          details: ["hint: specify -c <branch-name> explicitly"],
+
+    if (existingBranch.exitCode === 0 && branchMode !== "reset") {
+      if (target.kind === "pr" && !branch) {
+        throw new UsageError(`local branch already exists: ${implicitBranch}`, {
+          details: ["hint: specify -b <branch-name> explicitly"],
         });
       }
-      throw new UsageError(`branch already exists: ${effectiveCreateBranch}`);
+      throw new UsageError(`branch already exists: ${implicitBranch}`);
     }
-    await runner(
-      ["worktree", "add", "-b", effectiveCreateBranch, zonePath, target.commit],
-      { cwd: repo.currentWorktreePath },
-    );
+
+    const addArgs = ["worktree", "add"];
+    if (branchMode === "reset") {
+      addArgs.push("-B", implicitBranch);
+    } else {
+      addArgs.push("-b", implicitBranch);
+    }
+
+    let startPoint = target.commit;
+    if (target.kind === "remote") {
+      addArgs.push("--track");
+      startPoint = target.remoteBranch;
+    }
+
+    addArgs.push(zonePath, startPoint);
+    await runner(addArgs, { cwd: repo.currentWorktreePath });
     return {
       lines: [
         `created worktree: ${zonePath}`,
-        `checked out: ${effectiveCreateBranch}`,
+        `checked out: ${implicitBranch}`,
       ],
       hookContext: {
         event: "post-add",
@@ -61,7 +91,7 @@ export async function runAddCommand(options: {
         mainWorktree: repo.mainWorktreePath,
         worktreePath: zonePath,
         zoneName,
-        branch: effectiveCreateBranch,
+        branch: implicitBranch,
       },
     };
   }

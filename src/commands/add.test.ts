@@ -101,7 +101,7 @@ describe("runAddCommand", () => {
     ).rejects.toThrow(UsageError);
   });
 
-  test("allows overriding the default PR branch with -c", async () => {
+  test("allows overriding the default PR branch with -b", async () => {
     const repo = await createRepoContext();
     const runner = createFakeRunner((args) => {
       if (args.join(" ") === "show-ref --verify --quiet refs/heads/pr-123-review") {
@@ -127,10 +127,34 @@ describe("runAddCommand", () => {
       repo,
       target,
       worktrees: [],
-      createBranch: "pr-123-review",
+      branch: "pr-123-review",
+      branchMode: "create",
     });
 
     expect(result.lines[1]).toBe("checked out: pr-123-review");
     expect(result.hookContext.branch).toBe("pr-123-review");
+  });
+
+  test("supports explicit detached add", async () => {
+    const repo = await createRepoContext();
+    const commands: string[] = [];
+    const runner = createFakeRunner((args) => {
+      commands.push(args.join(" "));
+      if (args[0] === "worktree" && args[1] === "add") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    const result = await runAddCommand({
+      runner,
+      repo,
+      target: { kind: "head", commit: "abc1234" },
+      worktrees: [],
+      detach: true,
+    });
+
+    expect(result.lines[1]).toBe("checked out: detached at abc1234");
+    expect(commands).toContain(`worktree add --detach ${path.join(repo.repoParent, ".zone", "repo", "head-abc1234")} abc1234`);
   });
 });

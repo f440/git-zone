@@ -10,11 +10,12 @@ import { runHook } from "./core/hooks.js";
 import { resolveRepoContext } from "./core/repo.js";
 import { resolveAddTarget } from "./core/resolve-target.js";
 import { getWorktreeEntries } from "./core/worktree.js";
+import type { AddBranchMode } from "./core/types.js";
 
 type ParsedArgs =
   | { kind: "global-help" }
   | { kind: "global-version" }
-  | { kind: "add"; target?: string; createBranch?: string }
+  | { kind: "add"; target?: string; branch?: string; branchMode?: AddBranchMode; detach: boolean }
   | { kind: "list" }
   | { kind: "remove"; inputs: string[]; deleteBranch: boolean; force: boolean };
 
@@ -23,7 +24,7 @@ const GLOBAL_HELP = `git-zone
 Usage:
   git-zone --help
   git-zone --version
-  git-zone add [<target>] [-c|--create-branch <name>]
+  git-zone add [<target>] [-b <branch> | -B <branch>] [--detach]
   git-zone list
   git-zone remove <name-or-path>... [-b|--delete-branch] [-f|--force]
 `;
@@ -33,8 +34,9 @@ const ADD_HELP = `git-zone add
 Usage:
   git-zone add
   git-zone add <target>
-  git-zone add <target> -c <branch-name>
-  git-zone add -c <branch-name>
+  git-zone add <target> -b <branch-name>
+  git-zone add <target> -B <branch-name>
+  git-zone add [<target>] --detach
 `;
 
 const LIST_HELP = `git-zone list
@@ -81,7 +83,9 @@ export async function main(argv: string[]): Promise<number> {
         runner: git,
         repo,
         target,
-        createBranch: parsed.createBranch,
+        branch: parsed.branch,
+        branchMode: parsed.branchMode,
+        detach: parsed.detach,
         worktrees,
       });
       process.stdout.write(`${result.lines.join("\n")}\n`);
@@ -185,22 +189,29 @@ function parseArgs(argv: string[]): ParsedArgs {
 
 function parseAddArgs(args: string[]): ParsedArgs {
   let target: string | undefined;
-  let createBranch: string | undefined;
+  let branch: string | undefined;
+  let branchMode: AddBranchMode | undefined;
+  let detach = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]!;
     if (arg === "-h" || arg === "--help") {
-      return { kind: "add" };
+      return { kind: "add", detach: false };
     }
-    if (arg === "-c" || arg === "--create-branch") {
+    if (arg === "--detach") {
+      detach = true;
+      continue;
+    }
+    if (arg === "-b" || arg === "-B") {
       const next = args[index + 1];
       if (!next || next.startsWith("-")) {
         throw new UsageError(`${arg} requires a branch name`);
       }
-      if (createBranch) {
-        throw new UsageError(`${arg} can only be specified once`);
+      if (branch) {
+        throw new UsageError("only one of -b or -B may be specified");
       }
-      createBranch = next;
+      branch = next;
+      branchMode = arg === "-b" ? "create" : "reset";
       index += 1;
       continue;
     }
@@ -213,7 +224,11 @@ function parseAddArgs(args: string[]): ParsedArgs {
     target = arg;
   }
 
-  return { kind: "add", target, createBranch };
+  if (detach && branch) {
+    throw new UsageError("--detach cannot be used with -b or -B");
+  }
+
+  return { kind: "add", target, branch, branchMode, detach };
 }
 
 function parseListArgs(args: string[]): ParsedArgs {

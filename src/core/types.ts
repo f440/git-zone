@@ -1,7 +1,7 @@
 export type ResolvedAddTarget =
   | { kind: "head"; commit: string }
   | { kind: "branch"; branch: string; commit: string }
-  | { kind: "remote"; remoteBranch: string; commit: string }
+  | { kind: "remote"; remoteBranch: string; commit: string; guessedLocalBranch?: string }
   | { kind: "tag"; tag: string; commit: string }
   | { kind: "commit"; rev: string; commit: string }
   | {
@@ -101,6 +101,8 @@ export type AddCommandResult = {
   lines: string[];
   hookContext: HookContext;
 };
+
+export type AddBranchMode = "create" | "reset";
 
 export type RemoveCommandSuccess = {
   ok: true;
