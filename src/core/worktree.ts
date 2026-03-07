@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import type { GitRunner, WorktreeEntry, WorktreeStatus } from "./types.js";
@@ -64,11 +65,13 @@ export async function collectWorktreeStatus(
   entry: WorktreeEntry,
   mainWorktreePath: string,
 ): Promise<WorktreeStatus> {
+  const missing = !existsSync(entry.path);
   let upstream: string | null = null;
   let ahead: number | null = null;
   let behind: number | null = null;
+  let dirty = false;
 
-  if (!entry.detached && entry.branch) {
+  if (!missing && !entry.detached && entry.branch) {
     const upstreamResult = await runner(
       ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
       { cwd: entry.path, allowFailure: true },
@@ -86,9 +89,12 @@ export async function collectWorktreeStatus(
     }
   }
 
-  const dirtyResult = await runner(["status", "--porcelain"], {
-    cwd: entry.path,
-  });
+  if (!missing) {
+    const dirtyResult = await runner(["status", "--porcelain"], {
+      cwd: entry.path,
+    });
+    dirty = dirtyResult.stdout.trim() !== "";
+  }
 
   return {
     path: entry.path,
@@ -97,6 +103,7 @@ export async function collectWorktreeStatus(
       : path.basename(entry.path),
     current: entry.isCurrent,
     main: path.normalize(entry.path) === path.normalize(mainWorktreePath),
+    missing,
     branch: entry.branch,
     detached: entry.detached,
     bare: entry.bare,
@@ -106,6 +113,6 @@ export async function collectWorktreeStatus(
     upstream,
     ahead,
     behind,
-    dirty: dirtyResult.stdout.trim() !== "",
+    dirty,
   };
 }

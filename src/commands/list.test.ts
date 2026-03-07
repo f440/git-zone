@@ -57,6 +57,16 @@ describe("runListCommand", () => {
         prunable: false,
         isCurrent: false,
       },
+      {
+        path: "/definitely/missing/path",
+        head: "ddddddd4444444",
+        branch: "stale",
+        detached: false,
+        bare: false,
+        locked: false,
+        prunable: true,
+        isCurrent: false,
+      },
     ];
 
     const delays = new Map<string, number>([
@@ -110,8 +120,18 @@ describe("runListCommand", () => {
     const parsed = JSON.parse(output) as Array<{ path: string }>;
     expect(parsed.map((entry) => entry.path)).toEqual([
       "/repo",
+      "/definitely/missing/path",
       "/repo/.zone/repo/alpha",
       "/repo/.zone/repo/zeta",
     ]);
+
+    const missingEntry = parsed.find((entry) => entry.path === "/definitely/missing/path") as
+      | { missing?: boolean; upstream?: string | null; ahead?: number | null; behind?: number | null; dirty?: boolean }
+      | undefined;
+    expect(missingEntry?.missing).toBe(true);
+    expect(missingEntry?.upstream).toBeNull();
+    expect(missingEntry?.ahead).toBeNull();
+    expect(missingEntry?.behind).toBeNull();
+    expect(missingEntry?.dirty).toBe(false);
   });
 });

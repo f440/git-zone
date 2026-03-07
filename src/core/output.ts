@@ -7,7 +7,7 @@ export function formatWorktreeTable(statuses: WorktreeStatus[]): string {
     status.head.slice(0, 7),
     status.upstream ?? "-",
     formatDivergence(status.ahead, status.behind),
-    status.dirty ? "dirty" : "clean",
+    formatTreeState(status),
     status.path,
   ]);
 
@@ -27,6 +27,13 @@ export function formatWorktreeTable(statuses: WorktreeStatus[]): string {
         .trimEnd(),
     )
     .join("\n");
+}
+
+function formatTreeState(status: WorktreeStatus): string {
+  if (status.missing) {
+    return "missing";
+  }
+  return status.dirty ? "dirty" : "clean";
 }
 
 function formatDivergence(

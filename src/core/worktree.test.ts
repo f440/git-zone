@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import process from "node:process";
 
 import { GitCommandError } from "./errors.js";
 import { collectWorktreeStatus, parseWorktreeList } from "./worktree.js";
@@ -46,7 +47,7 @@ detached
 describe("collectWorktreeStatus", () => {
   test("reuses the parsed HEAD without calling rev-parse HEAD", async () => {
     const entry: WorktreeEntry = {
-      path: "/repo",
+      path: process.cwd(),
       head: "abcdef1234567890",
       branch: "main",
       detached: false,
@@ -70,9 +71,37 @@ describe("collectWorktreeStatus", () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    const status = await collectWorktreeStatus(runner, entry, "/repo");
+    const status = await collectWorktreeStatus(runner, entry, process.cwd());
 
     expect(status.head).toBe("abcdef1234567890");
+    expect(status.missing).toBe(false);
     expect(commands).not.toContain("rev-parse HEAD");
+  });
+
+  test("skips git commands for missing prunable worktrees", async () => {
+    const entry: WorktreeEntry = {
+      path: "/definitely/missing/path",
+      head: "abcdef1234567890",
+      branch: "gone-branch",
+      detached: false,
+      bare: false,
+      locked: false,
+      prunable: true,
+      isCurrent: false,
+    };
+    const commands: string[] = [];
+    const runner = createFakeRunner((args) => {
+      commands.push(args.join(" "));
+      throw new Error("runner should not be called for missing worktrees");
+    });
+
+    const status = await collectWorktreeStatus(runner, entry, "/repo");
+
+    expect(status.missing).toBe(true);
+    expect(status.upstream).toBeNull();
+    expect(status.ahead).toBeNull();
+    expect(status.behind).toBeNull();
+    expect(status.dirty).toBe(false);
+    expect(commands).toEqual([]);
   });
 });

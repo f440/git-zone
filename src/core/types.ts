@@ -42,6 +42,7 @@ export type WorktreeStatus = {
   zoneName: string | null;
   current: boolean;
   main: boolean;
+  missing: boolean;
   branch: string | null;
   detached: boolean;
   bare: boolean;
