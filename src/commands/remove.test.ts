@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { runRemoveCommand } from "./remove.js";
-import { GitCommandError } from "../core/errors.js";
+import { GitCommandError, HookExecutionError } from "../core/errors.js";
 import type { GitResult, GitRunner, RepoContext, WorktreeEntry } from "../core/types.js";
 
 function createFakeRunner(resolver: (args: string[]) => GitResult): GitRunner {
@@ -47,6 +47,59 @@ const worktrees: WorktreeEntry[] = [
 ];
 
 describe("runRemoveCommand", () => {
+  test("runs pre-remove hook before removing the worktree", async () => {
+    const commands: string[] = [];
+    const hookEvents: string[] = [];
+    const runner = createFakeRunner((args) => {
+      commands.push(args.join(" "));
+      if (args.join(" ") === "worktree remove /repo/.zone/repo/feature-remove-me") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    const result = await runRemoveCommand({
+      runner,
+      repo,
+      worktrees,
+      inputs: ["feature/remove-me"],
+      deleteBranch: false,
+      force: false,
+      runPreRemoveHook: async (context) => {
+        hookEvents.push(context.event);
+      },
+    });
+
+    expect(result.failures).toBe(0);
+    expect(hookEvents).toEqual(["pre-remove"]);
+    expect(commands).toEqual(["worktree remove /repo/.zone/repo/feature-remove-me"]);
+  });
+
+  test("stops removal when pre-remove hook fails", async () => {
+    const commands: string[] = [];
+    const runner = createFakeRunner((args) => {
+      commands.push(args.join(" "));
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    const result = await runRemoveCommand({
+      runner,
+      repo,
+      worktrees,
+      inputs: ["feature/remove-me"],
+      deleteBranch: false,
+      force: false,
+      runPreRemoveHook: async () => {
+        throw new HookExecutionError("pre-remove", 7, "./scripts/zone-pre-remove");
+      },
+    });
+
+    expect(result.failures).toBe(1);
+    expect(result.results[0]?.ok).toBe(false);
+    expect(result.results[0]?.lines.join("\n")).toContain("pre-remove hook failed with exit code 7");
+    expect(commands).toEqual([]);
+  });
+
   test("explains when the worktree is already removed but branch deletion fails", async () => {
     const runner = createFakeRunner((args) => {
       const command = args.join(" ");
@@ -71,6 +124,7 @@ describe("runRemoveCommand", () => {
       inputs: ["feature/remove-me"],
       deleteBranch: true,
       force: false,
+      runPreRemoveHook: async () => {},
     });
 
     expect(result.failures).toBe(1);

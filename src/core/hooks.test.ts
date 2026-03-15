@@ -46,6 +46,17 @@ describe("getHookCommand", () => {
 
     await expect(getHookCommand(runner, "/repo", "post-remove")).resolves.toBeNull();
   });
+
+  test("resolves pre-remove hook config", async () => {
+    const runner = createFakeRunner((args) => {
+      if (args.join(" ") === "config --get zone.hooks.preRemove") {
+        return { stdout: "./scripts/zone-pre-remove\n", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    await expect(getHookCommand(runner, "/repo", "pre-remove")).resolves.toBe("./scripts/zone-pre-remove");
+  });
 });
 
 describe("buildHookEnvironment", () => {
@@ -111,5 +122,23 @@ describe("runHook", () => {
     await expect(
       runHook(runner, { ...context, event: "post-remove" }, shellRunner),
     ).rejects.toThrow(HookExecutionError);
+  });
+
+  test("passes pre-remove event through the hook environment", async () => {
+    const runner = createFakeRunner((args) => {
+      if (args.join(" ") === "config --get zone.hooks.preRemove") {
+        return { stdout: "echo ok\n", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    const calls: Array<{ command: string; cwd: string; env: Record<string, string> }> = [];
+    const shellRunner: ShellRunner = async (command, options) => {
+      calls.push({ command, cwd: options.cwd, env: options.env });
+      return 0;
+    };
+
+    await expect(runHook(runner, { ...context, event: "pre-remove" }, shellRunner)).resolves.toBe(true);
+    expect(calls[0]?.env.ZONE_EVENT).toBe("pre-remove");
   });
 });

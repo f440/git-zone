@@ -141,18 +141,20 @@ Use `-f` or `--force` to force removal when Git would normally refuse it.
 
 ## Hooks
 
-`git-zone` can run user-defined commands after a worktree is added or removed.
+`git-zone` can run user-defined commands when a worktree is added or removed.
 
 Configure hooks with Git config:
 
 ```bash
 git config zone.hooks.postAdd './scripts/zone-post-add'
+git config zone.hooks.preRemove './scripts/zone-pre-remove'
 git config zone.hooks.postRemove './scripts/zone-post-remove'
 ```
 
 Hook commands are executed by `/bin/sh -c` from the main worktree directory.
 
 `postAdd` runs after a worktree has been created successfully.
+`preRemove` runs before a worktree is removed. A non-zero exit aborts removal for that target.
 `postRemove` runs after a worktree has been removed successfully.
 
 Hooks receive the following environment variables:
@@ -179,6 +181,15 @@ Example `postRemove` hook:
 set -eu
 
 tmux kill-session -t "zone-$ZONE_ZONE_NAME" || true
+```
+
+Example `preRemove` hook:
+
+```bash
+#!/bin/sh
+set -eu
+
+docker compose -p "zone-$ZONE_ZONE_NAME" down
 ```
 
 ## Examples

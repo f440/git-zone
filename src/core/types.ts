@@ -93,7 +93,7 @@ export type PullRequestMetadata = {
   headCommit: string;
 };
 
-export type HookEvent = "post-add" | "post-remove";
+export type HookEvent = "post-add" | "pre-remove" | "post-remove";
 
 export type HookContext = {
   event: HookEvent;

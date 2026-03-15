@@ -486,6 +486,58 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_MAIN_WORKTREE" "$Z
     await expect(fs.access(path.join(fixture.zoneRoot, "feature-remove-hook"))).rejects.toThrow();
   });
 
+  test("runs preRemove hooks before removal and passes original branch info", async () => {
+    const fixture = await setupRepositoryFixture();
+    const addResult = runCli(["add", "main", "-b", "feature/pre-remove-hook"], fixture.repoPath);
+    expect(addResult.exitCode).toBe(0);
+
+    const outputPath = path.join(fixture.root, "hook-pre-remove.txt");
+    await fs.mkdir(path.join(fixture.repoPath, "scripts"), { recursive: true });
+    await writeFile(
+      path.join(fixture.repoPath, "scripts", "zone-pre-remove"),
+      `#!/bin/sh
+set -eu
+printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_MAIN_WORKTREE" "$ZONE_WORKTREE_PATH" "$ZONE_ZONE_NAME" "$ZONE_BRANCH" "$(test -d "$ZONE_WORKTREE_PATH" && echo present)" > "${outputPath}"
+`,
+    );
+    spawnGit(["config", "zone.hooks.preRemove", "./scripts/zone-pre-remove"], fixture.repoPath);
+    await fs.chmod(path.join(fixture.repoPath, "scripts", "zone-pre-remove"), 0o755);
+
+    const removeResult = runCli(["remove", "feature/pre-remove-hook", "-b"], fixture.repoPath);
+
+    expect(removeResult.exitCode).toBe(0);
+    expect(removeResult.stdout).toContain("removed:");
+    const hookOutput = (await fs.readFile(outputPath, "utf8")).trim().split("\n");
+    expect(hookOutput[0]).toBe(fixture.repoPath);
+    expect(hookOutput[1]).toBe("pre-remove");
+    expect(hookOutput[2]).toBe(fixture.repoPath);
+    expect(hookOutput[3]).toBe(path.join(fixture.zoneRoot, "feature-pre-remove-hook"));
+    expect(hookOutput[4]).toBe("feature-pre-remove-hook");
+    expect(hookOutput[5]).toBe("feature/pre-remove-hook");
+    expect(hookOutput[6]).toBe("present");
+    await expect(fs.access(path.join(fixture.zoneRoot, "feature-pre-remove-hook"))).rejects.toThrow();
+  });
+
+  test("stops removal when preRemove hook fails", async () => {
+    const fixture = await setupRepositoryFixture();
+    expect(runCli(["add", "main", "-b", "feature/pre-remove-fail"], fixture.repoPath).exitCode).toBe(0);
+
+    await fs.mkdir(path.join(fixture.repoPath, "scripts"), { recursive: true });
+    await writeFile(
+      path.join(fixture.repoPath, "scripts", "zone-pre-remove"),
+      "#!/bin/sh\nexit 7\n",
+    );
+    spawnGit(["config", "zone.hooks.preRemove", "./scripts/zone-pre-remove"], fixture.repoPath);
+    await fs.chmod(path.join(fixture.repoPath, "scripts", "zone-pre-remove"), 0o755);
+
+    const result = runCli(["remove", "feature/pre-remove-fail", "-b"], fixture.repoPath);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).not.toContain("removed:");
+    expect(result.stderr).toContain("pre-remove hook failed with exit code 7");
+    await fs.access(path.join(fixture.zoneRoot, "feature-pre-remove-fail"));
+  });
+
   test("continues remove when postRemove hook fails and returns non-zero overall", async () => {
     const fixture = await setupRepositoryFixture();
     expect(runCli(["add", "main", "-b", "feature/hook-one"], fixture.repoPath).exitCode).toBe(0);

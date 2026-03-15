@@ -14,6 +14,7 @@ export type ShellRunner = (
 
 const HOOK_CONFIG_KEYS: Record<HookEvent, string> = {
   "post-add": "zone.hooks.postAdd",
+  "pre-remove": "zone.hooks.preRemove",
   "post-remove": "zone.hooks.postRemove",
 };
 

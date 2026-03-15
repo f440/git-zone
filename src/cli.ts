@@ -122,6 +122,9 @@ export async function main(argv: string[]): Promise<number> {
       inputs: parsed.inputs,
       deleteBranch: parsed.deleteBranch,
       force: parsed.force,
+      runPreRemoveHook: async (context) => {
+        await runHook(git, context);
+      },
     });
     const stdoutLines: string[] = [];
     const stderrLines: string[] = [];
