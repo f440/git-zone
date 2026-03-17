@@ -55,16 +55,46 @@ export async function ensureZonePathDoesNotExistWithContext(
 export async function buildZonePath(
   repo: RepoContext,
   target: ResolvedAddTarget,
+  pathTemplate: string,
   createBranch?: string,
 ): Promise<{ zoneName: string; zonePath: string }> {
   const requestedName = createBranch ?? zoneNameFromTarget(target);
   const zoneName = normalizeZoneName(requestedName);
-  const zonePath = path.join(repo.repoParent, ".zone", repo.repoName, zoneName);
+  const zonePath = resolveZonePathTemplate(repo, pathTemplate, zoneName);
   await ensureZonePathDoesNotExistWithContext(zonePath, {
     requestedName,
     normalizedName: zoneName,
   });
   return { zoneName, zonePath };
+}
+
+export function resolveZonePathTemplate(
+  repo: RepoContext,
+  pathTemplate: string,
+  workspace: string,
+): string {
+  if (!pathTemplate.includes("${workspace}")) {
+    throw new UsageError("zone.workspace.pathTemplate must include ${workspace}");
+  }
+  if (!endsWithWorkspaceSegment(pathTemplate)) {
+    throw new UsageError("zone.workspace.pathTemplate must place ${workspace} in the final path segment");
+  }
+
+  const expandedPath = pathTemplate
+    .replaceAll("${repo}", repo.repoName)
+    .replaceAll("${workspace}", workspace);
+
+  if (path.isAbsolute(expandedPath)) {
+    return path.normalize(expandedPath);
+  }
+
+  return path.resolve(repo.mainWorktreePath, expandedPath);
+}
+
+function endsWithWorkspaceSegment(pathTemplate: string): boolean {
+  const normalizedTemplate = pathTemplate.replaceAll("\\", "/").replace(/\/+$/, "");
+  const segments = normalizedTemplate.split("/");
+  return segments[segments.length - 1] === "${workspace}";
 }
 
 function zoneNameFromTarget(target: ResolvedAddTarget): string {

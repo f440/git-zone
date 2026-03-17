@@ -24,7 +24,6 @@ describe("runListCommand", () => {
       mainWorktreePath: "/repo",
       commonGitDir: "/repo/.git",
       repoName: "repo",
-      repoParent: "/",
     };
     const worktrees: WorktreeEntry[] = [
       {

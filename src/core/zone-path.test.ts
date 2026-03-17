@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { PathAlreadyExistsError, UsageError } from "./errors.js";
-import { buildZonePath, normalizeZoneName } from "./zone-path.js";
+import { DEFAULT_WORKSPACE_PATH_TEMPLATE } from "./config.js";
+import { buildZonePath, normalizeZoneName, resolveZonePathTemplate } from "./zone-path.js";
 import type { RepoContext, ResolvedAddTarget } from "./types.js";
 
 function createRepoContext(repoParent: string): RepoContext {
@@ -15,7 +16,6 @@ function createRepoContext(repoParent: string): RepoContext {
     mainWorktreePath,
     commonGitDir: path.join(mainWorktreePath, ".git"),
     repoName: "repo",
-    repoParent,
   };
 }
 
@@ -45,7 +45,7 @@ describe("buildZonePath", () => {
       headBranch: "feature/login-fix",
     };
 
-    const result = await buildZonePath(repo, target, "fix/pr-123");
+    const result = await buildZonePath(repo, target, DEFAULT_WORKSPACE_PATH_TEMPLATE, "fix/pr-123");
 
     expect(result.zoneName).toBe("fix-pr-123");
     expect(result.zonePath).toBe(path.join(repoParent, ".zone", "repo", "fix-pr-123"));
@@ -57,14 +57,19 @@ describe("buildZonePath", () => {
     const existingPath = path.join(repoParent, ".zone", "repo", "main");
     await fs.mkdir(existingPath, { recursive: true });
 
-    await expect(buildZonePath(repo, { kind: "branch", branch: "main", commit: "abc1234" })).rejects.toMatchObject({
-      name: PathAlreadyExistsError.name,
-      message: `zone path already exists: ${existingPath}`,
-      details: [
-        "requested zone name: main",
-        "normalized zone name: main",
-      ],
-    });
+    try {
+      await buildZonePath(repo, { kind: "branch", branch: "main", commit: "abc1234" }, DEFAULT_WORKSPACE_PATH_TEMPLATE);
+      throw new Error("expected buildZonePath to fail");
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: PathAlreadyExistsError.name,
+        message: `zone path already exists: ${existingPath}`,
+        details: [
+          "requested zone name: main",
+          "normalized zone name: main",
+        ],
+      });
+    }
   });
 
   test("explains zone name normalization on collision", async () => {
@@ -73,15 +78,55 @@ describe("buildZonePath", () => {
     const existingPath = path.join(repoParent, ".zone", "repo", "feature-login");
     await fs.mkdir(existingPath, { recursive: true });
 
-    await expect(
-      buildZonePath(repo, { kind: "branch", branch: "feature/login", commit: "abc1234" }),
-    ).rejects.toMatchObject({
-      name: PathAlreadyExistsError.name,
-      message: `zone path already exists: ${existingPath}`,
-      details: [
-        "requested zone name: feature/login",
-        "normalized zone name: feature-login",
-      ],
-    });
+    try {
+      await buildZonePath(repo, { kind: "branch", branch: "feature/login", commit: "abc1234" }, DEFAULT_WORKSPACE_PATH_TEMPLATE);
+      throw new Error("expected buildZonePath to fail");
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: PathAlreadyExistsError.name,
+        message: `zone path already exists: ${existingPath}`,
+        details: [
+          "requested zone name: feature/login",
+          "normalized zone name: feature-login",
+        ],
+      });
+    }
+  });
+});
+
+describe("resolveZonePathTemplate", () => {
+  test("resolves relative paths from the main worktree", () => {
+    const repo = createRepoContext("/tmp/root");
+
+    expect(resolveZonePathTemplate(repo, "../.zone/${repo}/${workspace}", "feature-login")).toBe(
+      path.join("/tmp/root", ".zone", "repo", "feature-login"),
+    );
+  });
+
+  test("keeps absolute paths absolute", () => {
+    const repo = createRepoContext("/tmp/root");
+
+    expect(resolveZonePathTemplate(repo, "/tmp/zones/${workspace}", "feature-login")).toBe(
+      path.join("/tmp/zones", "feature-login"),
+    );
+  });
+
+  test("requires the workspace placeholder", () => {
+    const repo = createRepoContext("/tmp/root");
+
+    expect(() => resolveZonePathTemplate(repo, "../.zone/${repo}", "feature-login")).toThrow(
+      new UsageError("zone.workspace.pathTemplate must include ${workspace}"),
+    );
+  });
+
+  test("requires the workspace placeholder to be the final path segment", () => {
+    const repo = createRepoContext("/tmp/root");
+
+    expect(() => resolveZonePathTemplate(repo, "/tmp/zones/${repo}-${workspace}", "feature-login")).toThrow(
+      new UsageError("zone.workspace.pathTemplate must place ${workspace} in the final path segment"),
+    );
+    expect(() => resolveZonePathTemplate(repo, "/tmp/zones/${workspace}/tree", "feature-login")).toThrow(
+      new UsageError("zone.workspace.pathTemplate must place ${workspace} in the final path segment"),
+    );
   });
 });

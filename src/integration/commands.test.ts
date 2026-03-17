@@ -102,6 +102,7 @@ async function setupRepositoryFixture(): Promise<{
   spawnGit(["clone", remotePath, repoPath], root, env);
   spawnGit(["config", "user.name", "Test User"], repoPath, env);
   spawnGit(["config", "user.email", "test@example.com"], repoPath, env);
+  spawnGit(["config", "zone.workspace.pathTemplate", "../.zone/${repo}/${workspace}"], repoPath, env);
   spawnGit(["checkout", "-b", "feature/local"], repoPath, env);
   await writeFile(path.join(repoPath, "local.txt"), "local branch\n");
   spawnGit(["add", "local.txt"], repoPath, env);
@@ -122,6 +123,28 @@ async function repoState(repoPath: string) {
 }
 
 describe("integration: add/list/remove", () => {
+  test("supports an absolute workspace path template", async () => {
+    const fixture = await setupRepositoryFixture();
+    const absoluteRoot = path.join(fixture.root, "absolute-zones");
+    spawnGit(["config", "zone.workspace.pathTemplate", path.join(absoluteRoot, "${workspace}")], fixture.repoPath);
+
+    const initial = await repoState(fixture.repoPath);
+    const target = await resolveAddTarget(git, initial.repo, "main");
+    const result = await runAddCommand({
+      runner: git,
+      repo: initial.repo,
+      target,
+      branch: "feature/absolute",
+      branchMode: "create",
+      worktrees: initial.worktrees,
+    });
+
+    expect(result.lines[0]).toBe(`created worktree: ${path.join(absoluteRoot, "feature-absolute")}`);
+    expect(
+      spawnGit(["rev-parse", "--abbrev-ref", "HEAD"], path.join(absoluteRoot, "feature-absolute")),
+    ).toBe("feature/absolute");
+  });
+
   test("adds worktrees for local branch, remote branch, tag, commit, and -b branch creation", async () => {
     const fixture = await setupRepositoryFixture();
     const initial = await repoState(fixture.repoPath);
@@ -243,14 +266,14 @@ describe("integration: add/list/remove", () => {
 
     const secondState = await repoState(fixture.repoPath);
     const secondTarget = await resolveAddTarget(git, secondState.repo, "feature/local");
-    await expect(
+    await expect(async () =>
       runAddCommand({
         runner: git,
         repo: secondState.repo,
         target: secondTarget,
         worktrees: secondState.worktrees,
       }),
-    ).rejects.toThrow();
+    ).toThrow();
 
     const forcedResult = await runAddCommand({
       runner: git,
@@ -267,14 +290,14 @@ describe("integration: add/list/remove", () => {
     await fs.mkdir(path.join(fixture.zoneRoot, "main"), { recursive: true });
     const collisionState = await repoState(fixture.repoPath);
     const collisionTarget = await resolveAddTarget(git, collisionState.repo, "main");
-    await expect(
+    await expect(async () =>
       runAddCommand({
         runner: git,
         repo: collisionState.repo,
         target: collisionTarget,
         worktrees: collisionState.worktrees,
       }),
-    ).rejects.toThrow("zone path already exists");
+    ).toThrow("zone path already exists");
   });
 
   test("allows reused branch checkout via CLI with -f", async () => {
@@ -483,7 +506,7 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_MAIN_WORKTREE" "$Z
     expect(hookOutput[3]).toBe(path.join(fixture.zoneRoot, "feature-remove-hook"));
     expect(hookOutput[4]).toBe("feature-remove-hook");
     expect(hookOutput[5]).toBe("feature/remove-hook");
-    await expect(fs.access(path.join(fixture.zoneRoot, "feature-remove-hook"))).rejects.toThrow();
+    await expect(async () => fs.access(path.join(fixture.zoneRoot, "feature-remove-hook"))).toThrow();
   });
 
   test("runs preRemove hooks before removal and passes original branch info", async () => {
@@ -515,7 +538,7 @@ printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$PWD" "$ZONE_EVENT" "$ZONE_MAIN_WORKTREE"
     expect(hookOutput[4]).toBe("feature-pre-remove-hook");
     expect(hookOutput[5]).toBe("feature/pre-remove-hook");
     expect(hookOutput[6]).toBe("present");
-    await expect(fs.access(path.join(fixture.zoneRoot, "feature-pre-remove-hook"))).rejects.toThrow();
+    await expect(async () => fs.access(path.join(fixture.zoneRoot, "feature-pre-remove-hook"))).toThrow();
   });
 
   test("stops removal when preRemove hook fails", async () => {
@@ -563,7 +586,7 @@ exit 0
     expect(result.stdout).toContain(`removed: ${path.join(fixture.zoneRoot, "feature-hook-one")}`);
     expect(result.stdout).toContain(`removed: ${path.join(fixture.zoneRoot, "feature-hook-two")}`);
     expect(result.stderr).toContain("post-remove hook failed with exit code 9");
-    await expect(fs.access(path.join(fixture.zoneRoot, "feature-hook-one"))).rejects.toThrow();
-    await expect(fs.access(path.join(fixture.zoneRoot, "feature-hook-two"))).rejects.toThrow();
+    await expect(async () => fs.access(path.join(fixture.zoneRoot, "feature-hook-one"))).toThrow();
+    await expect(async () => fs.access(path.join(fixture.zoneRoot, "feature-hook-two"))).toThrow();
   });
 });

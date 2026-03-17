@@ -119,9 +119,9 @@ describe("runHook", () => {
 
     const shellRunner: ShellRunner = async () => 7;
 
-    await expect(
+    await expect(async () =>
       runHook(runner, { ...context, event: "post-remove" }, shellRunner),
-    ).rejects.toThrow(HookExecutionError);
+    ).toThrow(HookExecutionError);
   });
 
   test("passes pre-remove event through the hook environment", async () => {

@@ -34,7 +34,6 @@ export type RepoContext = {
   mainWorktreePath: string;
   commonGitDir: string;
   repoName: string;
-  repoParent: string;
 };
 
 export type WorktreeStatus = {

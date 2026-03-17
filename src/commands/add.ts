@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { getWorkspacePathTemplate } from "../core/config.js";
 import { UsageError } from "../core/errors.js";
 import type {
   AddBranchMode,
@@ -39,7 +40,8 @@ export async function runAddCommand(options: {
         ?? (target.kind === "pr" ? target.headBranch : undefined)
         ?? (target.kind === "remote" ? target.guessedLocalBranch : undefined)
       : undefined;
-  const { zoneName, zonePath } = await buildZonePath(repo, target, implicitBranch);
+  const pathTemplate = await getWorkspacePathTemplate(runner, repo);
+  const { zoneName, zonePath } = await buildZonePath(repo, target, pathTemplate, implicitBranch);
 
   await fs.mkdir(path.dirname(zonePath), { recursive: true });
 

@@ -20,7 +20,6 @@ const repo: RepoContext = {
   mainWorktreePath: "/repo",
   commonGitDir: "/repo/.git",
   repoName: "repo",
-  repoParent: "/",
 };
 
 describe("resolveAddTarget", () => {
@@ -64,7 +63,7 @@ describe("resolveAddTarget", () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    await expect(resolveAddTarget(runner, repo, "release")).rejects.toThrow(AmbiguousTargetError);
+    await expect(async () => resolveAddTarget(runner, repo, "release")).toThrow(AmbiguousTargetError);
   });
 
   test("resolves generic commits when no exact refs match", async () => {

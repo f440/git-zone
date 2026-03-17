@@ -108,7 +108,19 @@ Pull request resolution requires the GitHub CLI (`gh`).
 
 `-f` does not bypass existing local branch collisions for `-b`, default pull request branch names, or zone path collisions.
 
-New worktrees are created under a `.zone` directory next to the main repository, grouped by repository name.
+Worktree placement is controlled by the Git config key `zone.workspace.pathTemplate`.
+The template supports `${repo}` and `${workspace}`. Relative paths are resolved from the main worktree root.
+`${workspace}` must be the final path segment.
+
+```bash
+git config zone.workspace.pathTemplate '../.zone/${repo}/${workspace}'
+```
+
+If you want compatibility with Claude Code's `claude --worktree` layout, configure:
+
+```bash
+git config zone.workspace.pathTemplate '.claude/worktrees/${workspace}'
+```
 
 ### `git-zone list`
 

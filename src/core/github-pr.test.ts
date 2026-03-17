@@ -28,7 +28,6 @@ const repo: RepoContext = {
   mainWorktreePath: "/repo",
   commonGitDir: "/repo/.git",
   repoName: "repo",
-  repoParent: "/",
 };
 
 describe("parsePullRequestUrl", () => {
@@ -180,7 +179,7 @@ describe("resolvePullRequestRemoteForNumber", () => {
       throw new Error(`unexpected command: ${command}`);
     });
 
-    await expect(resolvePullRequestRemoteForNumber(runner, "/repo")).rejects.toThrow(PullRequestResolutionError);
+    await expect(async () => resolvePullRequestRemoteForNumber(runner, "/repo")).toThrow(PullRequestResolutionError);
   });
 });
 
@@ -258,13 +257,13 @@ describe("resolvePullRequestRemoteForUrl", () => {
       throw new Error(`unexpected command: ${args.join(" ")}`);
     });
 
-    await expect(
+    await expect(async () =>
       resolvePullRequestRemoteForUrl(runner, "/repo", {
         host: "github.com",
         owner: "other",
         repo: "repo",
       }),
-    ).rejects.toThrow(PullRequestResolutionError);
+    ).toThrow(PullRequestResolutionError);
   });
 });
 

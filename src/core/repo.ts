@@ -38,7 +38,6 @@ export async function resolveRepoContext(
 
   const mainWorktreePath = path.dirname(commonGitDir);
   const repoName = path.basename(mainWorktreePath);
-  const repoParent = path.dirname(mainWorktreePath);
 
   return {
     cwd,
@@ -46,6 +45,5 @@ export async function resolveRepoContext(
     commonGitDir,
     mainWorktreePath,
     repoName,
-    repoParent,
   };
 }
