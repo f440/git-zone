@@ -95,6 +95,85 @@ describe("buildZonePath", () => {
 });
 
 describe("resolveZonePathTemplate", () => {
+  test("expands environment variables in absolute paths", () => {
+    const repo = createRepoContext("/tmp/root");
+    const originalHome = process.env.HOME;
+    process.env.HOME = "/tmp/home-dir";
+
+    try {
+      expect(resolveZonePathTemplate(repo, "${HOME}/zones/${workspace}", "feature-login")).toBe(
+        path.join("/tmp/home-dir", "zones", "feature-login"),
+      );
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
+      }
+    }
+  });
+
+  test("expands environment variables in relative paths", () => {
+    const repo = createRepoContext("/tmp/root");
+    const originalZoneRoot = process.env.ZONE_ROOT;
+    process.env.ZONE_ROOT = ".cache/zones";
+
+    try {
+      expect(resolveZonePathTemplate(repo, "${ZONE_ROOT}/${repo}/${workspace}", "feature-login")).toBe(
+        path.join("/tmp/root", "repo", ".cache", "zones", "repo", "feature-login"),
+      );
+    } finally {
+      if (originalZoneRoot === undefined) {
+        delete process.env.ZONE_ROOT;
+      } else {
+        process.env.ZONE_ROOT = originalZoneRoot;
+      }
+    }
+  });
+
+  test("prefers reserved placeholders over environment variables", () => {
+    const repo = createRepoContext("/tmp/root");
+    const originalRepo = process.env.repo;
+    const originalWorkspace = process.env.workspace;
+    process.env.repo = "env-repo";
+    process.env.workspace = "env-workspace";
+
+    try {
+      expect(resolveZonePathTemplate(repo, "../.zone/${repo}/${workspace}", "feature-login")).toBe(
+        path.join("/tmp/root", ".zone", "repo", "feature-login"),
+      );
+    } finally {
+      if (originalRepo === undefined) {
+        delete process.env.repo;
+      } else {
+        process.env.repo = originalRepo;
+      }
+      if (originalWorkspace === undefined) {
+        delete process.env.workspace;
+      } else {
+        process.env.workspace = originalWorkspace;
+      }
+    }
+  });
+
+  test("fails when an environment variable is undefined", () => {
+    const repo = createRepoContext("/tmp/root");
+    const originalZoneRoot = process.env.ZONE_ROOT;
+    delete process.env.ZONE_ROOT;
+
+    try {
+      expect(() => resolveZonePathTemplate(repo, "${ZONE_ROOT}/${workspace}", "feature-login")).toThrow(
+        new UsageError("zone.workspace.pathTemplate references undefined environment variable: ${ZONE_ROOT}"),
+      );
+    } finally {
+      if (originalZoneRoot === undefined) {
+        delete process.env.ZONE_ROOT;
+      } else {
+        process.env.ZONE_ROOT = originalZoneRoot;
+      }
+    }
+  });
+
   test("resolves relative paths from the main worktree", () => {
     const repo = createRepoContext("/tmp/root");
 

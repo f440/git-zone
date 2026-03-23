@@ -109,11 +109,17 @@ Pull request resolution requires the GitHub CLI (`gh`).
 `-f` does not bypass existing local branch collisions for `-b`, default pull request branch names, or zone path collisions.
 
 Worktree placement is controlled by the Git config key `zone.workspace.pathTemplate`.
-The template supports `${repo}` and `${workspace}`. Relative paths are resolved from the main worktree root.
+The template supports `${repo}`, `${workspace}`, and environment variables such as `${HOME}`.
+Relative paths are resolved from the main worktree root.
 `${workspace}` must be the final path segment.
+Undefined environment variables are rejected as configuration errors.
 
 ```bash
 git config zone.workspace.pathTemplate '../.zone/${repo}/${workspace}'
+```
+
+```bash
+git config zone.workspace.pathTemplate '${HOME}/.local/share/git-zone/${workspace}'
 ```
 
 If you want compatibility with Claude Code's `claude --worktree` layout, configure:

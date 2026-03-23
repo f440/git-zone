@@ -123,6 +123,44 @@ async function repoState(repoPath: string) {
 }
 
 describe("integration: add/list/remove", () => {
+  test("supports environment variables in the workspace path template", async () => {
+    const fixture = await setupRepositoryFixture();
+    const homeRoot = path.join(fixture.root, "home");
+    const originalHome = process.env.HOME;
+    spawnGit(["config", "zone.workspace.pathTemplate", "${HOME}/.local/share/git-zone/${workspace}"], fixture.repoPath);
+
+    process.env.HOME = homeRoot;
+
+    try {
+      const initial = await repoState(fixture.repoPath);
+      const target = await resolveAddTarget(git, initial.repo, "main");
+      const result = await runAddCommand({
+        runner: git,
+        repo: initial.repo,
+        target,
+        branch: "feature/home-root",
+        branchMode: "create",
+        worktrees: initial.worktrees,
+      });
+
+      expect(result.lines[0]).toBe(
+        `created worktree: ${path.join(homeRoot, ".local", "share", "git-zone", "feature-home-root")}`,
+      );
+      expect(
+        spawnGit(
+          ["rev-parse", "--abbrev-ref", "HEAD"],
+          path.join(homeRoot, ".local", "share", "git-zone", "feature-home-root"),
+        ),
+      ).toBe("feature/home-root");
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
+      }
+    }
+  });
+
   test("supports an absolute workspace path template", async () => {
     const fixture = await setupRepositoryFixture();
     const absoluteRoot = path.join(fixture.root, "absolute-zones");

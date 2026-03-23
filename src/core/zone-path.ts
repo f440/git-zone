@@ -80,15 +80,34 @@ export function resolveZonePathTemplate(
     throw new UsageError("zone.workspace.pathTemplate must place ${workspace} in the final path segment");
   }
 
-  const expandedPath = pathTemplate
-    .replaceAll("${repo}", repo.repoName)
-    .replaceAll("${workspace}", workspace);
+  const expandedPath = expandPathTemplate(pathTemplate, {
+    repo: repo.repoName,
+    workspace,
+  });
 
   if (path.isAbsolute(expandedPath)) {
     return path.normalize(expandedPath);
   }
 
   return path.resolve(repo.mainWorktreePath, expandedPath);
+}
+
+function expandPathTemplate(
+  pathTemplate: string,
+  reservedValues: Record<"repo" | "workspace", string>,
+): string {
+  return pathTemplate.replaceAll(/\$\{([^}]+)\}/g, (match, name: string) => {
+    if (name in reservedValues) {
+      return reservedValues[name as keyof typeof reservedValues];
+    }
+
+    const value = process.env[name];
+    if (value === undefined) {
+      throw new UsageError(`zone.workspace.pathTemplate references undefined environment variable: \${${name}}`);
+    }
+
+    return value;
+  });
 }
 
 function endsWithWorkspaceSegment(pathTemplate: string): boolean {
