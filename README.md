@@ -254,7 +254,7 @@ git-zone remove --help
 
 `git-zone` is published to npm as `@f440/git-zone` through GitHub Actions trusted publishing.
 
-Before the first release, configure npm Trusted Publisher for:
+Trusted Publisher should be configured in npm for:
 
 - GitHub user: `f440`
 - Repository: `git-zone`
@@ -263,8 +263,11 @@ Before the first release, configure npm Trusted Publisher for:
 To publish a new version:
 
 ```bash
-npm version patch
-git push origin main --follow-tags
+npm version patch --no-git-tag-version
+git commit -am "Prepare vX.Y.Z release"
+git push origin main
+npm run release:draft
 ```
 
-Then publish a GitHub Release for the matching `vX.Y.Z` tag. The `publish.yml` workflow runs tests, builds the CLI, verifies the tag matches `package.json`, and publishes to npm.
+Then open the draft GitHub Release, review the generated notes, and click Publish release.
+The `publish.yml` workflow runs tests, builds the CLI, verifies the release tag matches `package.json`, and publishes to npm.
