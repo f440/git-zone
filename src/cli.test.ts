@@ -67,8 +67,9 @@ describe("cli add parsing", () => {
     }) as typeof process.stderr.write;
 
     try {
-      const exitCode = await main(["add", "HEAD", "-f"]);
+      const exitCode = await main(["add", "-f"]);
       expect(exitCode).toBe(1);
+      expect(stderr.join("")).toContain("add requires a target; implicit HEAD is not supported");
       expect(stderr.join("")).not.toContain("unknown option: -f");
     } finally {
       process.stderr.write = originalWrite;
