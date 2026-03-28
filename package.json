@@ -27,7 +27,7 @@
   "scripts": {
     "build": "bun build ./src/cli.ts --target=node --outfile=./dist/cli.js",
     "prepack": "bun run build",
-    "release:draft": "gh release create \"v${npm_package_version}\" --repo f440/git-zone --draft --generate-notes --target HEAD",
+    "release:draft": "gh release create \"v${npm_package_version}\" --repo f440/git-zone --draft --generate-notes --target \"$(git rev-parse HEAD)\"",
     "test": "bun test",
     "check": "bun test && bun run build"
   },
