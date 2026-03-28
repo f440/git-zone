@@ -12,18 +12,24 @@ It is designed for the common cases developers reach for every day:
 
 ## Installation
 
-Build the CLI and install it from this repository:
+Install from npm:
 
 ```bash
-npm install
-bun run build
-npm install -g .
+npm install -g @f440/git-zone
 ```
 
 After installation, the command is available as:
 
 ```bash
 git-zone
+```
+
+For local development from this repository:
+
+```bash
+npm install
+bun run build
+npm install -g .
 ```
 
 ## Quick Start
@@ -243,3 +249,22 @@ git-zone add --help
 git-zone list --help
 git-zone remove --help
 ```
+
+## Release
+
+`git-zone` is published to npm as `@f440/git-zone` through GitHub Actions trusted publishing.
+
+Before the first release, configure npm Trusted Publisher for:
+
+- GitHub user: `f440`
+- Repository: `git-zone`
+- Workflow filename: `publish.yml`
+
+To publish a new version:
+
+```bash
+npm version patch
+git push origin main --follow-tags
+```
+
+Then publish a GitHub Release for the matching `vX.Y.Z` tag. The `publish.yml` workflow runs tests, builds the CLI, verifies the tag matches `package.json`, and publishes to npm.

@@ -1,15 +1,37 @@
 {
-  "name": "git-zone",
+  "name": "@f440/git-zone",
   "version": "0.1.0",
   "description": "CLI for managing git worktrees by branch, ref, and pull request",
   "license": "MIT",
   "type": "module",
+  "homepage": "https://github.com/f440/git-zone#readme",
+  "bugs": {
+    "url": "https://github.com/f440/git-zone/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/f440/git-zone.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "bin": {
     "git-zone": "bin/git-zone"
   },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "bun build ./src/cli.ts --target=node --outfile=./dist/cli.js",
+    "prepack": "bun run build",
+    "release:draft": "gh release create \"v${npm_package_version}\" --repo f440/git-zone --draft --generate-notes --target HEAD",
     "test": "bun test",
     "check": "bun test && bun run build"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
