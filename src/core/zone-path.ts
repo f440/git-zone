@@ -126,7 +126,5 @@ function zoneNameFromTarget(target: ResolvedAddTarget): string {
       return target.tag;
     case "commit":
       return `commit-${target.commit.slice(0, 7)}`;
-    case "pr":
-      return `pr-${target.number}`;
   }
 }

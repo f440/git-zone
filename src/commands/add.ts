@@ -37,7 +37,6 @@ export async function runAddCommand(options: {
   const implicitBranch =
     !detach
       ? branch
-        ?? (target.kind === "pr" ? target.headBranch : undefined)
         ?? (target.kind === "remote" ? target.guessedLocalBranch : undefined)
       : undefined;
   const pathTemplate = await getWorkspacePathTemplate(runner, repo);
@@ -61,11 +60,6 @@ export async function runAddCommand(options: {
     });
 
     if (existingBranch.exitCode === 0 && branchMode !== "reset") {
-      if (target.kind === "pr" && !branch) {
-        throw new UsageError(`local branch already exists: ${implicitBranch}`, {
-          details: ["hint: specify -b <branch-name> explicitly"],
-        });
-      }
       throw new UsageError(`branch already exists: ${implicitBranch}`);
     }
 

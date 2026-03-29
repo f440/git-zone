@@ -37,12 +37,10 @@ describe("buildZonePath", () => {
     const repoParent = await fs.mkdtemp(path.join(os.tmpdir(), "git-zone-path-"));
     const repo = createRepoContext(repoParent);
     const target: ResolvedAddTarget = {
-      kind: "pr",
-      number: 123,
+      kind: "remote",
       commit: "abc1234",
-      remote: "origin",
-      repository: { host: "github.com", owner: "f440", repo: "repo" },
-      headBranch: "feature/login-fix",
+      remoteBranch: "origin/feature/login-fix",
+      guessedLocalBranch: "feature/login-fix",
     };
 
     const result = await buildZonePath(repo, target, DEFAULT_WORKSPACE_PATH_TEMPLATE, "fix/pr-123");

@@ -44,7 +44,6 @@ export class TargetNotFoundError extends CliError {}
 export class AmbiguousTargetError extends CliError {}
 export class PathAlreadyExistsError extends CliError {}
 export class GitCommandError extends CliError {}
-export class PullRequestResolutionError extends CliError {}
 export class HookExecutionError extends CliError {
   readonly event: HookEvent;
   readonly hookExitCode: number;

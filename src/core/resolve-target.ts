@@ -1,5 +1,4 @@
 import { AmbiguousTargetError, TargetNotFoundError, UsageError } from "./errors.js";
-import { resolvePullRequestMetadata } from "./github-pr.js";
 import type { GitRunner, RepoContext, ResolvedAddTarget } from "./types.js";
 
 async function refExists(
@@ -65,30 +64,6 @@ export async function resolveAddTarget(
     throw new UsageError("add requires a target; implicit HEAD is not supported", {
       details: ["hint: use an explicit target such as 'HEAD --detach' or 'HEAD -b <branch>'"],
     });
-  }
-
-  if (target.startsWith("http://") || target.startsWith("https://")) {
-    const resolved = await resolvePullRequestMetadata(runner, repo, target);
-    return {
-      kind: "pr",
-      number: resolved.number,
-      commit: resolved.headCommit,
-      remote: resolved.remote,
-      repository: resolved.repository,
-      headBranch: resolved.headBranch,
-    };
-  }
-
-  if (/^\d+$/.test(target)) {
-    const resolved = await resolvePullRequestMetadata(runner, repo, target);
-    return {
-      kind: "pr",
-      number: resolved.number,
-      commit: resolved.headCommit,
-      remote: resolved.remote,
-      repository: resolved.repository,
-      headBranch: resolved.headBranch,
-    };
   }
 
   const matches = {

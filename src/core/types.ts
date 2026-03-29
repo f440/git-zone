@@ -2,15 +2,7 @@ export type ResolvedAddTarget =
   | { kind: "branch"; branch: string; commit: string }
   | { kind: "remote"; remoteBranch: string; commit: string; guessedLocalBranch?: string }
   | { kind: "tag"; tag: string; commit: string }
-  | { kind: "commit"; rev: string; commit: string }
-  | {
-      kind: "pr";
-      number: number;
-      commit: string;
-      remote: string;
-      repository: ParsedGitHubRepo;
-      headBranch: string;
-    };
+  | { kind: "commit"; rev: string; commit: string };
 
 export type WorktreeEntry = {
   path: string;
@@ -68,29 +60,6 @@ export type GitRunner = (
     allowFailure?: boolean;
   },
 ) => Promise<GitResult>;
-
-export type ParsedGitHubRepo = {
-  host: string;
-  owner: string;
-  repo: string;
-};
-
-export type ParsedPullRequestUrl = ParsedGitHubRepo & {
-  number: number;
-};
-
-export type GitHubRemote = {
-  name: string;
-  repository: ParsedGitHubRepo;
-};
-
-export type PullRequestMetadata = {
-  number: number;
-  repository: ParsedGitHubRepo;
-  remote: string;
-  headBranch: string;
-  headCommit: string;
-};
 
 export type HookEvent = "post-add" | "pre-remove" | "post-remove";
 

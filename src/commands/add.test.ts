@@ -32,7 +32,7 @@ async function createRepoContext(): Promise<RepoContext> {
 }
 
 describe("runAddCommand", () => {
-  test("uses the PR head branch as the default local branch", async () => {
+  test("uses the guessed remote branch name as the default local branch", async () => {
     const repo = await createRepoContext();
     const commands: string[] = [];
     const runner = createFakeRunner((args) => {
@@ -50,12 +50,10 @@ describe("runAddCommand", () => {
     });
 
     const target: ResolvedAddTarget = {
-      kind: "pr",
-      number: 123,
+      kind: "remote",
       commit: "abc123",
-      remote: "origin",
-      repository: { host: "github.com", owner: "f440", repo: "git-zone" },
-      headBranch: "feature/login-fix",
+      remoteBranch: "origin/feature/login-fix",
+      guessedLocalBranch: "feature/login-fix",
     };
 
     const result = await runAddCommand({
@@ -71,11 +69,11 @@ describe("runAddCommand", () => {
     ]);
     expect(result.hookContext.branch).toBe("feature/login-fix");
     expect(commands).toContain(
-      `worktree add -b feature/login-fix ${path.join(path.dirname(repo.mainWorktreePath), ".zone", "repo", "feature-login-fix")} abc123`,
+      `worktree add -b feature/login-fix --track ${path.join(path.dirname(repo.mainWorktreePath), ".zone", "repo", "feature-login-fix")} origin/feature/login-fix`,
     );
   });
 
-  test("rejects default PR branch collisions with a hint", async () => {
+  test("rejects guessed remote branch collisions", async () => {
     const repo = await createRepoContext();
     const runner = createFakeRunner((args) => {
       if (args.join(" ") === "config --get zone.workspace.pathTemplate") {
@@ -88,12 +86,10 @@ describe("runAddCommand", () => {
     });
 
     const target: ResolvedAddTarget = {
-      kind: "pr",
-      number: 123,
+      kind: "remote",
       commit: "abc123",
-      remote: "origin",
-      repository: { host: "github.com", owner: "f440", repo: "git-zone" },
-      headBranch: "feature/login-fix",
+      remoteBranch: "origin/feature/login-fix",
+      guessedLocalBranch: "feature/login-fix",
     };
 
     await expect(async () =>
@@ -106,7 +102,7 @@ describe("runAddCommand", () => {
     ).toThrow(UsageError);
   });
 
-  test("allows overriding the default PR branch with -b", async () => {
+  test("allows overriding the guessed remote branch with -b", async () => {
     const repo = await createRepoContext();
     const runner = createFakeRunner((args) => {
       if (args.join(" ") === "config --get zone.workspace.pathTemplate") {
@@ -122,12 +118,10 @@ describe("runAddCommand", () => {
     });
 
     const target: ResolvedAddTarget = {
-      kind: "pr",
-      number: 123,
+      kind: "remote",
       commit: "abc123",
-      remote: "origin",
-      repository: { host: "github.com", owner: "f440", repo: "git-zone" },
-      headBranch: "feature/login-fix",
+      remoteBranch: "origin/feature/login-fix",
+      guessedLocalBranch: "feature/login-fix",
     };
 
     const result = await runAddCommand({
@@ -234,7 +228,7 @@ describe("runAddCommand", () => {
     ).toThrow("branch already exists: existing");
   });
 
-  test("does not let force bypass default PR branch collisions", async () => {
+  test("does not let force bypass guessed remote branch collisions", async () => {
     const repo = await createRepoContext();
     const runner = createFakeRunner((args) => {
       if (args.join(" ") === "config --get zone.workspace.pathTemplate") {
@@ -251,17 +245,15 @@ describe("runAddCommand", () => {
         runner,
         repo,
         target: {
-          kind: "pr",
-          number: 123,
+          kind: "remote",
           commit: "abc123",
-          remote: "origin",
-          repository: { host: "github.com", owner: "f440", repo: "git-zone" },
-          headBranch: "feature/login-fix",
+          remoteBranch: "origin/feature/login-fix",
+          guessedLocalBranch: "feature/login-fix",
         },
         force: true,
         worktrees: [],
       }),
-    ).toThrow("local branch already exists: feature/login-fix");
+    ).toThrow("branch already exists: feature/login-fix");
   });
 
   test("passes -f together with -B when resetting a branch", async () => {

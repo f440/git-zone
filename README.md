@@ -8,7 +8,7 @@ It is designed for the common cases developers reach for every day:
 - create a new branch in its own worktree
 - inspect all worktrees in a repository at a glance
 - remove a worktree by path, branch name, or directory name
-- open a worktree from a GitHub pull request, tag, or commit
+- open a worktree from a tag or commit
 
 ## Installation
 
@@ -72,15 +72,6 @@ Create a new branch from `main` in a new worktree:
 git-zone add main -b spike/new-idea
 ```
 
-Open a pull request in its own worktree:
-
-```bash
-git-zone add 123
-git-zone add https://github.com/owner/repo/pull/123
-```
-
-When the target is a pull request, `git-zone` creates a local branch using the pull request's head branch name by default.
-
 Show all worktrees for the current repository:
 
 ```bash
@@ -108,13 +99,8 @@ The target can be:
 - a remote-tracking branch such as `origin/main`
 - a tag
 - a commit or revision
-- a GitHub pull request number
-- a GitHub pull request URL
-
-Numeric targets are interpreted as pull request numbers before branch resolution. A branch name made only of digits will therefore be treated as a pull request target.
 
 When the target is a local branch, the new worktree checks out that branch.
-When the target is a pull request, the new worktree creates and checks out a local branch with the pull request head branch name by default.
 When the target is a plain branch name and only a matching remote-tracking branch exists, `git-zone` creates a local tracking branch by default.
 When the target is an explicit remote branch, tag, commit, or `HEAD`, the new worktree is created in detached HEAD state unless you choose a branch explicitly.
 
@@ -122,17 +108,13 @@ Use `-b` to create a new branch, `-B` to reset or reuse a branch name, `--detach
 
 ```bash
 git-zone add main -b spike/new-idea
-git-zone add 123 -b fix/pr-123
 git-zone add origin/main -B feature/from-remote
 git-zone add HEAD --detach
 git-zone add HEAD -d
 git-zone add main -f
-git-zone add 123 --detach
 ```
 
-Pull request resolution requires the GitHub CLI (`gh`).
-
-`-f` does not bypass existing local branch collisions for `-b`, default pull request branch names, or zone path collisions.
+`-f` does not bypass existing local branch collisions for `-b`, default branch names guessed from remote-tracking branches, or zone path collisions.
 
 Worktree placement is controlled by the Git config key `zone.workspace.pathTemplate`.
 The template supports `${repo}`, `${workspace}`, and environment variables such as `${HOME}`.
@@ -152,6 +134,94 @@ If you want compatibility with Claude Code's `claude --worktree` layout, configu
 
 ```bash
 git config zone.workspace.pathTemplate '.claude/worktrees/${workspace}'
+```
+
+### Optional: `gh zone` alias for pull requests
+
+If you use GitHub CLI, you can install an optional `gh zone` alias that fetches a pull request head ref and opens it with `git-zone`.
+
+```sh
+gh alias set --shell zone - <<'SH'
+sel=$1
+shift || { echo "usage: gh zone <pr-url-or-number> [git-zone args...]" >&2; exit 1; }
+
+repo_of_remote() {
+  url=$(git remote get-url "$1" 2>/dev/null) || return 1
+  case "$url" in
+    https://github.com/*) repo=${url#https://github.com/} ;;
+    git@github.com:*) repo=${url#git@github.com:} ;;
+    ssh://git@github.com/*) repo=${url#ssh://git@github.com/} ;;
+    *) return 1 ;;
+  esac
+  printf '%s\n' "${repo%.git}"
+}
+
+base_remote() {
+  for r in $(git remote); do
+    [ "$(git config --get "remote.$r.gh-resolved" 2>/dev/null)" = "base" ] || continue
+    [ -z "$found" ] || return 1
+    found=$r
+  done
+  [ -n "$found" ] && printf '%s\n' "$found"
+}
+
+pick_remote_for_repo() {
+  want=$1
+  for r in $(git remote); do
+    [ "$(repo_of_remote "$r")" = "$want" ] || continue
+    if [ "$(git config --get "remote.$r.gh-resolved" 2>/dev/null)" = "base" ]; then
+      printf '%s\n' "$r"
+      return
+    fi
+    [ -z "$first" ] && first=$r || {
+      echo "gh zone: multiple remotes match $want; mark one as gh-resolved=base" >&2
+      return 1
+    }
+  done
+  [ -n "$first" ] && printf '%s\n' "$first" || {
+    echo "gh zone: no git remote matches $want" >&2
+    return 1
+  }
+}
+
+meta=$(gh pr view "$sel" --json number,headRefName --jq '[.number,.headRefName] | @tsv') || exit $?
+pr=$(printf '%s\n' "$meta" | cut -f1)
+branch=$(printf '%s\n' "$meta" | cut -f2-)
+
+case "$sel" in
+  https://github.com/*/pull/*|http://github.com/*/pull/*)
+    path=${sel#https://github.com/}
+    path=${path#http://github.com/}
+    owner=${path%%/*}
+    rest=${path#*/}
+    repo=${rest%%/*}
+    remote=$(pick_remote_for_repo "$owner/$repo") || exit 1
+    ;;
+  *)
+    remote=$(git config --get checkout.defaultRemote 2>/dev/null || true)
+    [ -n "$remote" ] || remote=$(base_remote 2>/dev/null || true)
+    [ -n "$remote" ] || remote=origin
+    ;;
+esac
+
+git fetch "$remote" "refs/pull/$pr/head" || exit $?
+
+for a in "$@"; do
+  case "$a" in
+    -b|-B|--detach|-d) exec git zone add FETCH_HEAD "$@" ;;
+  esac
+done
+
+exec git zone add FETCH_HEAD -b "$branch" "$@"
+SH
+```
+
+Usage:
+
+```sh
+gh zone 12345
+gh zone https://github.com/owner/repo/pull/12345
+gh zone 12345 -B my/local-branch
 ```
 
 ### `git-zone list`
@@ -245,7 +315,6 @@ git-zone add main
 git-zone add origin/main
 git-zone add v1.2.3
 git-zone add abc1234
-git-zone add 123
 ```
 
 Create a branch directly into a new worktree:
