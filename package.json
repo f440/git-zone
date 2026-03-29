@@ -1,6 +1,6 @@
 {
   "name": "@f440/git-zone",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "CLI for managing git worktrees by branch, ref, and pull request",
   "license": "MIT",
   "type": "module",
