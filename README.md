@@ -24,6 +24,26 @@ After installation, the command is available as:
 git-zone
 ```
 
+### Zsh completion
+
+`git-zone` ships with a `zsh` completion file at `completions/_git-zone`.
+
+For a global npm install, add the package completion directory to your `fpath` and initialize completions:
+
+```bash
+fpath+=("$(npm root -g)/@f440/git-zone/completions")
+autoload -Uz compinit && compinit
+```
+
+When working from a local checkout of this repository, point `fpath` at the repository copy instead:
+
+```bash
+fpath+=("/path/to/git-zone/completions")
+autoload -Uz compinit && compinit
+```
+
+After reloading your shell, `git-zone` completes subcommands, flags, Git refs for `add`, and existing worktree targets for `remove`.
+
 For local development from this repository:
 
 ```bash

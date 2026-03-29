@@ -20,16 +20,18 @@
   },
   "files": [
     "bin",
+    "completions",
     "dist",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "bun build ./src/cli.ts --target=node --outfile=./dist/cli.js",
+    "check:completion": "zsh -n completions/_git-zone",
     "prepack": "bun run build",
     "release:draft": "gh release create \"v${npm_package_version}\" --repo f440/git-zone --draft --generate-notes",
     "test": "bun test",
-    "check": "bun test && bun run build"
+    "check": "bun test && bun run build && bun run check:completion"
   },
   "publishConfig": {
     "access": "public"

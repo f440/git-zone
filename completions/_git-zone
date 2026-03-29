@@ -1,0 +1,183 @@
+#compdef git-zone
+
+typeset -ga _git_zone_remove_zone_cache
+typeset -ga _git_zone_remove_branch_cache
+typeset -ga _git_zone_remove_path_cache
+
+_git_zone_branch_name() {
+  _message 'branch name'
+}
+
+_git_zone_head_target() {
+  _wanted special-targets expl 'special target' compadd -Q -S '' -- HEAD
+}
+
+_git_zone_local_branches() {
+  local -a branches
+  local branch
+
+  while IFS= read -r branch; do
+    [[ -n "$branch" ]] && branches+=("$branch")
+  done < <(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
+
+  (( ${#branches[@]} )) || return 1
+  _wanted local-branches expl 'local branch' compadd -Q -S '' -- "${branches[@]}"
+}
+
+_git_zone_remote_branches() {
+  local -a branches
+  local branch
+
+  while IFS= read -r branch; do
+    [[ -z "$branch" || "$branch" == */HEAD ]] && continue
+    branches+=("$branch")
+  done < <(git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null)
+
+  (( ${#branches[@]} )) || return 1
+  _wanted remote-branches expl 'remote branch' compadd -Q -S '' -- "${branches[@]}"
+}
+
+_git_zone_tags() {
+  local -a tags
+  local tag
+
+  while IFS= read -r tag; do
+    [[ -n "$tag" ]] && tags+=("$tag")
+  done < <(git for-each-ref --format='%(refname:short)' refs/tags 2>/dev/null)
+
+  (( ${#tags[@]} )) || return 1
+  _wanted tags expl 'tag' compadd -Q -S '' -- "${tags[@]}"
+}
+
+_git_zone_add_targets() {
+  _alternative \
+    'special-targets:special target:_git_zone_head_target' \
+    'local-branches:local branch:_git_zone_local_branches' \
+    'remote-branches:remote branch:_git_zone_remote_branches' \
+    'tags:tag:_git_zone_tags'
+}
+
+_git_zone_collect_remove_candidates() {
+  local line worktree_path branch main_path
+
+  _git_zone_remove_zone_cache=()
+  _git_zone_remove_branch_cache=()
+  _git_zone_remove_path_cache=()
+  main_path=''
+  worktree_path=''
+  branch=''
+
+  while IFS= read -r line; do
+    if [[ -z "$line" ]]; then
+      if [[ -n "$worktree_path" && "$worktree_path" != "$main_path" ]]; then
+        _git_zone_remove_zone_cache+=("${worktree_path:t}")
+        [[ -n "$branch" ]] && _git_zone_remove_branch_cache+=("$branch")
+        _git_zone_remove_path_cache+=("$worktree_path")
+      fi
+      worktree_path=''
+      branch=''
+      continue
+    fi
+
+    case "$line" in
+      'worktree '*)
+        worktree_path=${line#worktree }
+        [[ -z "$main_path" ]] && main_path=$worktree_path
+        ;;
+      'branch '*)
+        branch=${line#branch }
+        [[ "$branch" == refs/heads/* ]] && branch=${branch#refs/heads/}
+        ;;
+    esac
+  done < <({
+    git worktree list --porcelain 2>/dev/null
+    print
+  })
+}
+
+_git_zone_remove_zone_names() {
+  (( ${#_git_zone_remove_zone_cache[@]} )) || return 1
+  _wanted zone-names expl 'worktree directory' compadd -Q -S '' -- "${_git_zone_remove_zone_cache[@]}"
+}
+
+_git_zone_remove_branches() {
+  (( ${#_git_zone_remove_branch_cache[@]} )) || return 1
+  _wanted worktree-branches expl 'worktree branch' compadd -Q -S '' -- "${_git_zone_remove_branch_cache[@]}"
+}
+
+_git_zone_remove_paths() {
+  (( ${#_git_zone_remove_path_cache[@]} )) || return 1
+  _wanted worktree-paths expl 'worktree path' compadd -Q -S '' -- "${_git_zone_remove_path_cache[@]}"
+}
+
+_git_zone_remove_targets() {
+  _git_zone_collect_remove_candidates
+
+  _alternative \
+    'zone-names:worktree directory:_git_zone_remove_zone_names' \
+    'branches:worktree branch:_git_zone_remove_branches' \
+    'paths:worktree path:_git_zone_remove_paths'
+}
+
+_git_zone_add() {
+  _arguments -s \
+    '(-h --help)'{-h,--help}'[show add command help]' \
+    '(-b -B --detach -d)'{-d,--detach}'[create the worktree in detached HEAD state]' \
+    '(-d --detach -B)'-b'[create a new branch in the worktree]:branch name:_git_zone_branch_name' \
+    '(-d --detach -b)'-B'[reset or reuse a branch name in the worktree]:branch name:_git_zone_branch_name' \
+    '(-f --force)'{-f,--force}'[allow a branch that is already checked out in another worktree]' \
+    '1:target:_git_zone_add_targets'
+}
+
+_git_zone_list() {
+  _arguments -s \
+    '(-h --help)'{-h,--help}'[show list command help]' \
+    '--json[output worktrees as JSON]'
+}
+
+_git_zone_remove() {
+  _arguments -s \
+    '(-h --help)'{-h,--help}'[show remove command help]' \
+    '(-b --delete-branch)'{-b,--delete-branch}'[delete the branch after removing the worktree]' \
+    '(-f --force)'{-f,--force}'[force worktree removal]' \
+    '*:target:_git_zone_remove_targets'
+}
+
+_git_zone() {
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
+  local -a commands
+
+  commands=(
+    'add:create a new worktree'
+    'list:list worktrees in the current repository'
+    'remove:remove one or more worktrees'
+  )
+
+  _arguments -C -s \
+    '(-h --help)'{-h,--help}'[show help]' \
+    '(-v --version)'{-v,--version}'[show version]' \
+    '1:command:->command' \
+    '*::arg:->args'
+
+  case "$state" in
+    command)
+      _describe -t commands 'git-zone command' commands
+      ;;
+    args)
+      case "$line[1]" in
+        add)
+          _git_zone_add
+          ;;
+        list)
+          _git_zone_list
+          ;;
+        remove)
+          _git_zone_remove
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_git_zone "$@"
