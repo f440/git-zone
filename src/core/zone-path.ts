@@ -57,15 +57,52 @@ export async function buildZonePath(
   target: ResolvedAddTarget,
   pathTemplate: string,
   createBranch?: string,
+  options: {
+    allowSuffixOnCollision?: boolean;
+  } = {},
 ): Promise<{ zoneName: string; zonePath: string }> {
   const requestedName = createBranch ?? zoneNameFromTarget(target);
   const zoneName = normalizeZoneName(requestedName);
-  const zonePath = resolveZonePathTemplate(repo, pathTemplate, zoneName);
+  const zonePath = await resolveAvailableZonePath(repo, pathTemplate, zoneName, options);
   await ensureZonePathDoesNotExistWithContext(zonePath, {
     requestedName,
     normalizedName: zoneName,
   });
-  return { zoneName, zonePath };
+  return { zoneName: path.basename(zonePath), zonePath };
+}
+
+async function resolveAvailableZonePath(
+  repo: RepoContext,
+  pathTemplate: string,
+  baseZoneName: string,
+  options: {
+    allowSuffixOnCollision?: boolean;
+  },
+): Promise<string> {
+  const zonePath = resolveZonePathTemplate(repo, pathTemplate, baseZoneName);
+  if (!options.allowSuffixOnCollision) {
+    return zonePath;
+  }
+
+  if (!(await zonePathExists(zonePath))) {
+    return zonePath;
+  }
+
+  for (let suffix = 2; ; suffix += 1) {
+    const candidateZonePath = resolveZonePathTemplate(repo, pathTemplate, `${baseZoneName}-${suffix}`);
+    if (!(await zonePathExists(candidateZonePath))) {
+      return candidateZonePath;
+    }
+  }
+}
+
+async function zonePathExists(zonePath: string): Promise<boolean> {
+  try {
+    await fs.access(zonePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function resolveZonePathTemplate(

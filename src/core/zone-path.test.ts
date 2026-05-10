@@ -90,6 +90,47 @@ describe("buildZonePath", () => {
       });
     }
   });
+
+  test("uses the smallest available suffix when allowed", async () => {
+    const repoParent = await fs.mkdtemp(path.join(os.tmpdir(), "git-zone-path-suffix-"));
+    const repo = createRepoContext(repoParent);
+    await fs.mkdir(path.join(repoParent, ".zone", "repo", "origin-main"), { recursive: true });
+    await fs.mkdir(path.join(repoParent, ".zone", "repo", "origin-main-2"), { recursive: true });
+    await fs.mkdir(path.join(repoParent, ".zone", "repo", "origin-main-4"), { recursive: true });
+
+    const result = await buildZonePath(
+      repo,
+      {
+        kind: "remote",
+        commit: "abc1234",
+        remoteBranch: "origin/main",
+        guessedLocalBranch: "main",
+      },
+      DEFAULT_WORKSPACE_PATH_TEMPLATE,
+      undefined,
+      { allowSuffixOnCollision: true },
+    );
+
+    expect(result.zoneName).toBe("origin-main-3");
+    expect(result.zonePath).toBe(path.join(repoParent, ".zone", "repo", "origin-main-3"));
+  });
+
+  test("appends suffixes without interpreting numeric base names", async () => {
+    const repoParent = await fs.mkdtemp(path.join(os.tmpdir(), "git-zone-path-numeric-"));
+    const repo = createRepoContext(repoParent);
+    await fs.mkdir(path.join(repoParent, ".zone", "repo", "release-2"), { recursive: true });
+
+    const result = await buildZonePath(
+      repo,
+      { kind: "tag", tag: "release-2", commit: "abc1234" },
+      DEFAULT_WORKSPACE_PATH_TEMPLATE,
+      undefined,
+      { allowSuffixOnCollision: true },
+    );
+
+    expect(result.zoneName).toBe("release-2-2");
+    expect(result.zonePath).toBe(path.join(repoParent, ".zone", "repo", "release-2-2"));
+  });
 });
 
 describe("resolveZonePathTemplate", () => {

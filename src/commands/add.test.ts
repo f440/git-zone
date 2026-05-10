@@ -166,6 +166,75 @@ describe("runAddCommand", () => {
     );
   });
 
+  test("honors detach for branch targets", async () => {
+    const repo = await createRepoContext();
+    const commands: string[] = [];
+    const runner = createFakeRunner((args) => {
+      commands.push(args.join(" "));
+      if (args.join(" ") === "config --get zone.workspace.pathTemplate") {
+        return { stdout: "", stderr: "", exitCode: 1, command: ["git", ...args] };
+      }
+      if (args[0] === "worktree" && args[1] === "add") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    const result = await runAddCommand({
+      runner,
+      repo,
+      target: { kind: "branch", branch: "main", commit: "abc1234" },
+      worktrees: [],
+      detach: true,
+    });
+
+    expect(result.lines[1]).toBe("checked out: detached at abc1234");
+    expect(result.hookContext.zoneName).toBe("main");
+    expect(result.hookContext.branch).toBe("");
+    expect(commands).toContain(
+      `worktree add --detach ${path.join(path.dirname(repo.mainWorktreePath), ".zone", "repo", "main")} abc1234`,
+    );
+  });
+
+  test("uses a numbered zone name for detached add path collisions", async () => {
+    const repo = await createRepoContext();
+    const existingPath = path.join(path.dirname(repo.mainWorktreePath), ".zone", "repo", "origin-feature-remote");
+    await fs.mkdir(existingPath, { recursive: true });
+    const commands: string[] = [];
+    const runner = createFakeRunner((args) => {
+      commands.push(args.join(" "));
+      if (args.join(" ") === "config --get zone.workspace.pathTemplate") {
+        return { stdout: "", stderr: "", exitCode: 1, command: ["git", ...args] };
+      }
+      if (args[0] === "worktree" && args[1] === "add") {
+        return { stdout: "", stderr: "", exitCode: 0, command: ["git", ...args] };
+      }
+      throw new Error(`unexpected command: ${args.join(" ")}`);
+    });
+
+    const result = await runAddCommand({
+      runner,
+      repo,
+      target: {
+        kind: "remote",
+        commit: "abc1234",
+        remoteBranch: "origin/feature/remote",
+        guessedLocalBranch: "feature/remote",
+      },
+      worktrees: [],
+      detach: true,
+    });
+
+    const expectedPath = path.join(path.dirname(repo.mainWorktreePath), ".zone", "repo", "origin-feature-remote-2");
+    expect(result.lines).toEqual([
+      `created worktree: ${expectedPath}`,
+      "checked out: detached at abc1234",
+    ]);
+    expect(result.hookContext.zoneName).toBe("origin-feature-remote-2");
+    expect(result.hookContext.branch).toBe("");
+    expect(commands).toContain(`worktree add --detach ${expectedPath} abc1234`);
+  });
+
   test("skips the branch-in-use precheck and passes -f for existing branch checkout", async () => {
     const repo = await createRepoContext();
     const commands: string[] = [];

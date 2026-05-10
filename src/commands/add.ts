@@ -40,7 +40,9 @@ export async function runAddCommand(options: {
         ?? (target.kind === "remote" ? target.guessedLocalBranch : undefined)
       : undefined;
   const pathTemplate = await getWorkspacePathTemplate(runner, repo);
-  const { zoneName, zonePath } = await buildZonePath(repo, target, pathTemplate, implicitBranch);
+  const { zoneName, zonePath } = await buildZonePath(repo, target, pathTemplate, implicitBranch, {
+    allowSuffixOnCollision: detach,
+  });
 
   await fs.mkdir(path.dirname(zonePath), { recursive: true });
 
@@ -96,7 +98,7 @@ export async function runAddCommand(options: {
     };
   }
 
-  if (target.kind === "branch") {
+  if (target.kind === "branch" && !detach) {
     const addArgs = ["worktree", "add"];
     if (force) {
       addArgs.push("-f");
