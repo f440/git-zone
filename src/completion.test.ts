@@ -47,7 +47,7 @@ describe("zsh completion", () => {
   });
 
   test("collects remove candidates without clobbering PATH", async () => {
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "git-zone-completion-"));
+    const tempRoot = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "git-zone-completion-")));
     const repoPath = path.join(tempRoot, "repo");
     const worktreePath = path.join(tempRoot, "feature-remove-me");
 
